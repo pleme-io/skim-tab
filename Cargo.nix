@@ -6048,10 +6048,10 @@ rec {
       };
       "skim" = rec {
         crateName = "skim";
-        version = "3.6.2";
+        version = "3.7.0";
         edition = "2024";
         crateBin = [];
-        sha256 = "0g8779q57kjgyw3ahwphbsy2l0mqdyz696dx4grc5z0s5zwisbcz";
+        sha256 = "0p6nddziqx06m3v0jkwavww8a894xqw3dmppl52769lvcqy2nx27";
         authors = [
           "Loric ANDRE"
           "Zhang Jinzhou <lotabout@gmail.com>"
@@ -6231,6 +6231,7 @@ rec {
         features = {
           "cli" = [ "dep:clap" "dep:clap_complete" "dep:shlex" "dep:env_logger" "dep:clap_mangen" ];
           "default" = [ "cli" ];
+          "gungraun" = [ "dep:gungraun" ];
         };
         resolvedDefaultFeatures = [ "cli" "default" ];
       };
