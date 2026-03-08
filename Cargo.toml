@@ -1,0 +1,28 @@
+[package]
+name = "skim-tab"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89.0"
+description = "Rust-native fuzzy completion bridge for zsh — drop-in fzf replacement for fzf-tab using skim"
+license = "MIT"
+authors = ["Pleme Team <team@pleme.io>"]
+repository = "https://github.com/pleme-io/skim-tab"
+homepage = "https://github.com/pleme-io/skim-tab"
+keywords = ["zsh", "completion", "fuzzy-finder", "skim", "fzf-tab"]
+categories = ["command-line-utilities"]
+exclude = ["module/", "target/", "result-*", "Cargo.nix", "flake.nix", "flake.lock"]
+
+[[bin]]
+name = "skim-tab"
+path = "src/main.rs"
+
+[dependencies]
+skim = "3.6"
+regex = "1"
+anyhow = "1.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
