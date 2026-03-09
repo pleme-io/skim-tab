@@ -13,7 +13,7 @@ use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
 use skim::Skim;
-use skim_tab::{base_options, parse_query, shell_quote};
+use skim_tab::{base_options, parse_query, shell_quote, ICON_FILES, ICON_MARKER};
 
 /// Run fd to discover files and directories.
 fn discover_files() -> Result<String> {
@@ -53,8 +53,8 @@ fn main() -> Result<()> {
     let options = base_options(query)
         .scheme(MatchScheme::Path)
         .multi(true)
-        .prompt("\u{1f4c2} ".to_string()) // 📂
-        .multi_select_icon("\u{25cf}".to_string()) // ●
+        .prompt(ICON_FILES.to_string())
+        .multi_select_icon(ICON_MARKER.to_string())
         .preview(preview_command())
         .preview_window(PreviewLayout::from("right:50%:hidden:wrap"))
         .header("Files/Dirs | TAB: Multi-select | CTRL-/: Toggle Preview".to_string())
