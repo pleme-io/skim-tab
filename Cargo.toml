@@ -12,6 +12,10 @@ keywords = ["zsh", "completion", "fuzzy-finder", "skim", "fzf-tab"]
 categories = ["command-line-utilities"]
 exclude = ["module/", "target/", "result-*", "Cargo.nix", "flake.nix", "flake.lock"]
 
+[lib]
+name = "skim_tab"
+path = "src/lib.rs"
+
 [[bin]]
 name = "skim-tab"
 path = "src/main.rs"
@@ -23,6 +27,10 @@ path = "src/history.rs"
 [[bin]]
 name = "skim-files"
 path = "src/files.rs"
+
+[[bin]]
+name = "skim-content"
+path = "src/content.rs"
 
 [dependencies]
 skim = "3.7"
