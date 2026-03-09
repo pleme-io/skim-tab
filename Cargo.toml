@@ -68,6 +68,42 @@ path = "src/localip.rs"
 name = "git-clean-branches"
 path = "src/gitclean.rs"
 
+[[bin]]
+name = "blx-ls"
+path = "src/ls.rs"
+
+[[bin]]
+name = "blx-backup"
+path = "src/backup.rs"
+
+[[bin]]
+name = "blx-weather"
+path = "src/weather.rs"
+
+[[bin]]
+name = "blx-urlencode"
+path = "src/urlencode.rs"
+
+[[bin]]
+name = "blx-urldecode"
+path = "src/urldecode.rs"
+
+[[bin]]
+name = "git-ac"
+path = "src/gitac.rs"
+
+[[bin]]
+name = "git-acp"
+path = "src/gitacp.rs"
+
+[[bin]]
+name = "git-ct"
+path = "src/gitct.rs"
+
+[[bin]]
+name = "blx-json"
+path = "src/json.rs"
+
 [dependencies]
 skim = "3.7"
 regex = "1"
