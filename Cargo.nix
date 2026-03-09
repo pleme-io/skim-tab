@@ -6241,6 +6241,11 @@ rec {
         edition = "2021";
         crateBin = [
           {
+            name = "skim-content";
+            path = "src/content.rs";
+            requiredFeatures = [ ];
+          }
+          {
             name = "skim-files";
             path = "src/files.rs";
             requiredFeatures = [ ];
@@ -6257,6 +6262,7 @@ rec {
           }
         ];
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./.; };
+        libName = "skim_tab";
         authors = [
           "Pleme Team <team@pleme.io>"
         ];

@@ -10,11 +10,10 @@ use std::io::{self, BufRead};
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use skim::{
-    options::MatchScheme,
-    prelude::{SkimItemReader, SkimOptionsBuilder},
-    Skim,
-};
+use skim::options::MatchScheme;
+use skim::prelude::SkimItemReader;
+use skim::Skim;
+use skim_tab::{base_options, parse_query};
 
 /// Parse a zsh extended history line.
 /// Format: `: TIMESTAMP:0;COMMAND` or just `COMMAND` (plain format).
@@ -43,11 +42,8 @@ fn read_history() -> Result<Vec<String>> {
         fs::File::open(&path).with_context(|| format!("failed to open {}", path.display()))?;
     let reader = io::BufReader::new(file);
 
-    // Track insertion order with a counter; higher = more recent.
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut counter: usize = 0;
-
-    // Handle multi-line commands (lines ending with backslash).
     let mut continuation = String::new();
 
     for line in reader.lines() {
@@ -77,7 +73,6 @@ fn read_history() -> Result<Vec<String>> {
         }
     }
 
-    // Sort by counter descending (most recent first).
     let mut entries: Vec<(String, usize)> = seen.into_iter().collect();
     entries.sort_unstable_by(|a, b| b.1.cmp(&a.1));
 
@@ -90,54 +85,17 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Parse --query from args.
     let args: Vec<String> = env::args().skip(1).collect();
-    let query = args
-        .iter()
-        .position(|a| a == "--query")
-        .and_then(|i| args.get(i + 1))
-        .map(String::as_str)
-        .unwrap_or("");
+    let query = parse_query(&args);
 
     let input = entries.join("\n");
     let item_reader = SkimItemReader::default();
     let items = item_reader.of_bufread(io::Cursor::new(input));
 
-    let options = SkimOptionsBuilder::default()
-        .query(query.to_string())
+    let options = base_options(query)
         .no_sort(true)
         .scheme(MatchScheme::History)
-        .height("40%".to_string())
-        .min_height("10".to_string())
-        .layout(skim::tui::options::TuiLayout::Reverse)
         .prompt("\u{276f} ".to_string())
-        .no_info(true)
-        .selector_icon("\u{25b8}".to_string())
-        .ansi(true)
-        .color(
-            [
-                "fg:#D8DEE9",       // Nord4 — Snow Storm
-                "bg:#2E3440",       // Nord0 — Polar Night
-                "hl:#88C0D0:bold:underlined", // Nord8 — Frost (match highlight)
-                "fg+:#ECEFF4:bold", // Nord6 — brightest Snow Storm (selected line)
-                "bg+:#3B4252",      // Nord1 — Polar Night (selected bg)
-                "hl+:#8FBCBB:bold:underlined", // Nord7 — Frost (selected match)
-                "info:#4C566A",     // Nord3 — muted Polar Night
-                "prompt:#A3BE8C",   // Nord14 — Aurora Green
-                "pointer:#88C0D0", // Nord8 — Frost (arrow indicator)
-                "marker:#B48EAD",   // Nord15 — Aurora Purple
-                "spinner:#81A1C1",  // Nord9 — Frost
-                "header:#5E81AC",   // Nord10 — Frost
-                "border:#4C566A",   // Nord3 — Polar Night
-                "query:#ECEFF4:bold", // Nord6 — bright query text
-            ]
-            .join(","),
-        )
-        .bind(vec![
-            "ctrl-/:toggle-preview".to_string(),
-            "ctrl-u:half-page-up".to_string(),
-            "ctrl-d:half-page-down".to_string(),
-        ])
         .build()
         .expect("failed to build skim options");
 
