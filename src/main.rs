@@ -381,7 +381,17 @@ fn parse_args(args: &[String]) -> Opts {
         } else if let Some(val) = strip_eq_or_next(arg, "--tabstop", args, &mut i) {
             opts.tabstop = val.parse().unwrap_or(0);
         } else if let Some(val) = strip_eq_or_next(arg, "--preview", args, &mut i) {
-            opts.preview = Some(val);
+            // skim hardcodes /bin/sh for preview execution (preview.rs line 304/392).
+            // fzf-tab's preview init script uses zsh-specific features (zmodload, local -a,
+            // mapfile, etc.) and sets SHELL=$ZSH_NAME. Without this wrapping, the preview
+            // runs through /bin/sh and every zsh command fails with "command not found".
+            let shell = std::env::var("SHELL").unwrap_or_default();
+            if !shell.is_empty() && shell != "sh" && shell != "/bin/sh" {
+                let escaped = val.replace('\'', "'\\''");
+                opts.preview = Some(format!("{shell} -c '{escaped}'"));
+            } else {
+                opts.preview = Some(val);
+            }
         } else if let Some(val) = strip_eq_or_next(arg, "--preview-window", args, &mut i) {
             opts.preview_window = Some(val);
         } else if let Some(val) = strip_eq_or_next(arg, "--expect", args, &mut i) {
