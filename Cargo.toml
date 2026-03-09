@@ -36,6 +36,38 @@ path = "src/content.rs"
 name = "skim-cd"
 path = "src/cd.rs"
 
+[[bin]]
+name = "skim-fvim"
+path = "src/fvim.rs"
+
+[[bin]]
+name = "skim-fco"
+path = "src/fco.rs"
+
+[[bin]]
+name = "skim-fkill"
+path = "src/fkill.rs"
+
+[[bin]]
+name = "skim-kpod"
+path = "src/kpod.rs"
+
+[[bin]]
+name = "genpass"
+path = "src/genpass.rs"
+
+[[bin]]
+name = "killport"
+path = "src/killport.rs"
+
+[[bin]]
+name = "localip"
+path = "src/localip.rs"
+
+[[bin]]
+name = "git-clean-branches"
+path = "src/gitclean.rs"
+
 [dependencies]
 skim = "3.7"
 regex = "1"
