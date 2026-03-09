@@ -13,7 +13,7 @@ use anyhow::{Context, Result};
 use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim::Skim;
-use skim_tab::{base_options, parse_query};
+use skim_tab::{base_options, parse_query, ICON_HISTORY};
 
 /// Parse a zsh extended history line.
 /// Format: `: TIMESTAMP:0;COMMAND` or just `COMMAND` (plain format).
@@ -95,7 +95,7 @@ fn main() -> Result<()> {
     let options = base_options(query)
         .no_sort(true)
         .scheme(MatchScheme::History)
-        .prompt("\u{276f} ".to_string())
+        .prompt(ICON_HISTORY.to_string())
         .build()
         .expect("failed to build skim options");
 

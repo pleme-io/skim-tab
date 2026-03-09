@@ -2,6 +2,8 @@
 //!
 //! Provides Nord color palette, CLI arg parsing, shell quoting, ANSI
 //! stripping, editor resolution, and skim builder presets.
+//!
+//! Theme: Nord (Arctic ice) with sleek Jedi-inspired iconography.
 
 use skim::prelude::SkimOptionsBuilder;
 use skim::tui::options::TuiLayout;
@@ -29,6 +31,24 @@ pub const STANDARD_BINDS: &[&str] = &[
     "ctrl-u:half-page-up",
     "ctrl-d:half-page-down",
 ];
+
+// ── Icons ──────────────────────────────────────────────────────────────
+// Sleek, terminal-safe glyphs. No wide emoji — just clean Unicode.
+
+/// Pointer/selector icon — lightsaber blade
+pub const ICON_POINTER: &str = "\u{2502}"; // │ (vertical bar — clean saber)
+
+/// Prompt: content search — crossed sabers
+pub const ICON_SEARCH: &str = "\u{2726} "; // ✦ (four-pointed star)
+
+/// Prompt: file picker — snowflake
+pub const ICON_FILES: &str = "\u{2744} "; // ❄ (snowflake)
+
+/// Prompt: history — hourglass
+pub const ICON_HISTORY: &str = "\u{276f} "; // ❯ (chevron — clean, fast)
+
+/// Multi-select marker
+pub const ICON_MARKER: &str = "\u{25c6}"; // ◆ (diamond — selected)
 
 /// Extract `--query <value>` from CLI args, returning empty string if absent.
 pub fn parse_query(args: &[String]) -> &str {
@@ -106,7 +126,7 @@ pub fn base_options(query: &str) -> SkimOptionsBuilder {
         .height("40%".to_string())
         .min_height("10".to_string())
         .layout(TuiLayout::Reverse)
-        .selector_icon("\u{25b8}".to_string()) // ▸
+        .selector_icon(ICON_POINTER.to_string())
         .no_info(true)
         .color(NORD_COLORS.to_string())
         .bind(STANDARD_BINDS.iter().map(|s| (*s).to_string()).collect::<Vec<_>>());
@@ -173,5 +193,15 @@ mod tests {
     fn base_options_builds() {
         let opts = base_options("test").build();
         assert!(opts.is_ok());
+    }
+
+    #[test]
+    fn icons_are_single_width() {
+        // All icons should be terminal-safe single-width characters
+        assert!(!ICON_POINTER.is_empty());
+        assert!(!ICON_SEARCH.is_empty());
+        assert!(!ICON_FILES.is_empty());
+        assert!(!ICON_HISTORY.is_empty());
+        assert!(!ICON_MARKER.is_empty());
     }
 }
