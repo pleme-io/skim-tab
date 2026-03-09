@@ -16,6 +16,10 @@ exclude = ["module/", "target/", "result-*", "Cargo.nix", "flake.nix", "flake.lo
 name = "skim-tab"
 path = "src/main.rs"
 
+[[bin]]
+name = "skim-history"
+path = "src/history.rs"
+
 [dependencies]
 skim = "3.7"
 regex = "1"
