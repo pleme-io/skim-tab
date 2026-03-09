@@ -110,27 +110,26 @@ fn main() -> Result<()> {
         .height("40%".to_string())
         .min_height("10".to_string())
         .layout(skim::tui::options::TuiLayout::Reverse)
-        .border(skim::tui::BorderType::Rounded)
         .prompt("\u{276f} ".to_string())
         .no_info(true)
         .selector_icon("\u{25b8}".to_string())
         .ansi(true)
         .color(
             [
-                "fg:#D8DEE9",
-                "bg:#2E3440",
-                "hl:#88C0D0:bold:underlined",
-                "fg+:#ECEFF4:bold",
-                "bg+:#3B4252",
-                "hl+:#8FBCBB:bold:underlined",
-                "info:#81A1C1",
-                "prompt:#A3BE8C",
-                "pointer:#BF616A",
-                "marker:#B48EAD",
-                "spinner:#81A1C1",
-                "header:#5E81AC",
-                "border:#4C566A",
-                "query:#ECEFF4",
+                "fg:#D8DEE9",       // Nord4 — Snow Storm
+                "bg:#2E3440",       // Nord0 — Polar Night
+                "hl:#88C0D0:bold:underlined", // Nord8 — Frost (match highlight)
+                "fg+:#ECEFF4:bold", // Nord6 — brightest Snow Storm (selected line)
+                "bg+:#3B4252",      // Nord1 — Polar Night (selected bg)
+                "hl+:#8FBCBB:bold:underlined", // Nord7 — Frost (selected match)
+                "info:#4C566A",     // Nord3 — muted Polar Night
+                "prompt:#A3BE8C",   // Nord14 — Aurora Green
+                "pointer:#88C0D0", // Nord8 — Frost (arrow indicator)
+                "marker:#B48EAD",   // Nord15 — Aurora Purple
+                "spinner:#81A1C1",  // Nord9 — Frost
+                "header:#5E81AC",   // Nord10 — Frost
+                "border:#4C566A",   // Nord3 — Polar Night
+                "query:#ECEFF4:bold", // Nord6 — bright query text
             ]
             .join(","),
         )
