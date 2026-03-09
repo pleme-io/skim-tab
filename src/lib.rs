@@ -50,6 +50,9 @@ pub const ICON_HISTORY: &str = "\u{276f} "; // ❯ (chevron — clean, fast)
 /// Multi-select marker
 pub const ICON_MARKER: &str = "\u{25c6}"; // ◆ (diamond — selected)
 
+/// Prompt: directory navigation — nav arrow
+pub const ICON_CD: &str = "\u{25b8} "; // ▸ (right triangle — navigate)
+
 /// Extract `--query <value>` from CLI args, returning empty string if absent.
 pub fn parse_query(args: &[String]) -> &str {
     args.iter()
@@ -203,5 +206,6 @@ mod tests {
         assert!(!ICON_FILES.is_empty());
         assert!(!ICON_HISTORY.is_empty());
         assert!(!ICON_MARKER.is_empty());
+        assert!(!ICON_CD.is_empty());
     }
 }

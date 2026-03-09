@@ -96,6 +96,7 @@ fn main() -> Result<()> {
         .no_sort(true)
         .scheme(MatchScheme::History)
         .prompt(ICON_HISTORY.to_string())
+        .header("History | ESC: Cancel".to_string())
         .build()
         .expect("failed to build skim options");
 

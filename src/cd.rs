@@ -1,8 +1,7 @@
-//! skim-files — Rust-native fuzzy file/directory picker for zsh.
+//! skim-cd — Rust-native fuzzy directory navigator for zsh.
 //!
-//! Runs `fd` to discover files and directories, presents them via skim
-//! with bat/eza preview, and prints selected paths to stdout.
-//! Supports multi-select (tab to toggle).
+//! Runs `fd` to discover directories, presents them via skim with
+//! eza tree preview, and prints the selected directory to stdout.
 
 use std::env;
 use std::io;
@@ -13,14 +12,12 @@ use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
 use skim::Skim;
-use skim_tab::{base_options, parse_query, shell_quote, ICON_FILES, ICON_MARKER};
+use skim_tab::{base_options, parse_query, shell_quote, ICON_CD};
 
-/// Run fd to discover files and directories.
-fn discover_files() -> Result<String> {
+/// Run fd to discover directories.
+fn discover_dirs() -> Result<String> {
     let output = Command::new("fd")
         .args([
-            "--type",
-            "f",
             "--type",
             "d",
             "--hidden",
@@ -43,21 +40,16 @@ fn discover_files() -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-/// Preview command: directories get eza tree, files get bat.
+/// Preview command: eza tree.
 fn preview_command() -> String {
-    "if [ -d {} ]; then \
-        eza --tree --level=2 --icons --color=always {} 2>/dev/null; \
-    else \
-        bat --color=always --style=numbers --line-range=:500 {} 2>/dev/null; \
-    fi"
-    .to_string()
+    "eza --tree --level=2 --icons --color=always {} 2>/dev/null".to_string()
 }
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
     let query = parse_query(&args);
 
-    let entries = discover_files()?;
+    let entries = discover_dirs()?;
     if entries.is_empty() {
         return Ok(());
     }
@@ -67,24 +59,17 @@ fn main() -> Result<()> {
 
     let options = base_options(query)
         .scheme(MatchScheme::Path)
-        .multi(true)
-        .prompt(ICON_FILES.to_string())
-        .multi_select_icon(ICON_MARKER.to_string())
+        .prompt(ICON_CD.to_string())
         .preview(preview_command())
         .preview_window(PreviewLayout::from("right:50%:wrap"))
-        .header("TAB: Multi-select | CTRL-/: Toggle Preview | ESC: Cancel".to_string())
+        .header("Directories | CTRL-/: Toggle Preview | ESC: Cancel".to_string())
         .build()
         .expect("failed to build skim options");
 
     match Skim::run_with(options, Some(items)) {
         Ok(out) if !out.is_abort => {
-            let paths: Vec<String> = out
-                .selected_items
-                .iter()
-                .map(|item| shell_quote(&item.output()))
-                .collect();
-            if !paths.is_empty() {
-                print!("{}", paths.join(" "));
+            if let Some(item) = out.selected_items.first() {
+                print!("{}", shell_quote(&item.output()));
             }
         }
         _ => {}
@@ -98,9 +83,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn preview_command_is_valid_shell() {
+    fn preview_command_uses_eza() {
         let cmd = preview_command();
-        assert!(cmd.contains("bat"));
         assert!(cmd.contains("eza"));
+        assert!(cmd.contains("--tree"));
     }
 }
