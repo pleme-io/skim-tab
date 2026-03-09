@@ -20,6 +20,10 @@ path = "src/main.rs"
 name = "skim-history"
 path = "src/history.rs"
 
+[[bin]]
+name = "skim-files"
+path = "src/files.rs"
+
 [dependencies]
 skim = "3.7"
 regex = "1"
