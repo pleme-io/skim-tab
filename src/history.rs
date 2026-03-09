@@ -90,7 +90,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Parse args.
+    // Parse --query from args.
     let args: Vec<String> = env::args().skip(1).collect();
     let query = args
         .iter()
@@ -98,20 +98,12 @@ fn main() -> Result<()> {
         .and_then(|i| args.get(i + 1))
         .map(String::as_str)
         .unwrap_or("");
-    let show_count = args.iter().any(|a| a == "--count");
 
     let input = entries.join("\n");
     let item_reader = SkimItemReader::default();
     let items = item_reader.of_bufread(io::Cursor::new(input));
 
-    let header = if show_count {
-        format!(" {} commands", entries.len())
-    } else {
-        String::new()
-    };
-
-    let mut builder = SkimOptionsBuilder::default();
-    builder
+    let options = SkimOptionsBuilder::default()
         .query(query.to_string())
         .no_sort(true)
         .scheme(MatchScheme::History)
@@ -120,7 +112,7 @@ fn main() -> Result<()> {
         .layout(skim::tui::options::TuiLayout::Reverse)
         .border(skim::tui::BorderType::Rounded)
         .prompt("\u{276f} ".to_string())
-        .info(skim::tui::statusline::InfoDisplay::Inline)
+        .no_info(true)
         .selector_icon("\u{25b8}".to_string())
         .ansi(true)
         .color(
@@ -146,13 +138,9 @@ fn main() -> Result<()> {
             "ctrl-/:toggle-preview".to_string(),
             "ctrl-u:half-page-up".to_string(),
             "ctrl-d:half-page-down".to_string(),
-        ]);
-
-    if !header.is_empty() {
-        builder.header(header);
-    }
-
-    let options = builder.build().expect("failed to build skim options");
+        ])
+        .build()
+        .expect("failed to build skim options");
 
     match Skim::run_with(options, Some(items)) {
         Ok(out) if !out.is_abort => {
