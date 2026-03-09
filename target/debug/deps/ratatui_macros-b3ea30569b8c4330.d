@@ -1,0 +1,10 @@
+/Users/drzzln/code/github/pleme-io/skim-tab/target/debug/deps/ratatui_macros-b3ea30569b8c4330.d: /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/lib.rs /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/layout.rs /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/line.rs /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/row.rs /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/span.rs /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/text.rs
+
+/Users/drzzln/code/github/pleme-io/skim-tab/target/debug/deps/libratatui_macros-b3ea30569b8c4330.rmeta: /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/lib.rs /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/layout.rs /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/line.rs /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/row.rs /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/span.rs /Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/text.rs
+
+/Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/lib.rs:
+/Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/layout.rs:
+/Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/line.rs:
+/Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/row.rs:
+/Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/span.rs:
+/Users/drzzln/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ratatui-macros-0.7.0/src/text.rs:
