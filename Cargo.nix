@@ -6241,6 +6241,11 @@ rec {
         edition = "2021";
         crateBin = [
           {
+            name = "skim-history";
+            path = "src/history.rs";
+            requiredFeatures = [ ];
+          }
+          {
             name = "skim-tab";
             path = "src/main.rs";
             requiredFeatures = [ ];
