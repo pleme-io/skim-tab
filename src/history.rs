@@ -103,14 +103,46 @@ fn main() -> Result<()> {
     let item_reader = SkimItemReader::default();
     let items = item_reader.of_bufread(io::Cursor::new(input));
 
+    let entry_count = entries.len();
+    let header = format!(" {} commands", entry_count);
+
     let options = SkimOptionsBuilder::default()
         .query(query.to_string())
         .no_sort(true)
         .scheme(MatchScheme::History)
         .height("40%".to_string())
+        .min_height("10".to_string())
         .layout(skim::tui::options::TuiLayout::Reverse)
-        .prompt("history> ".to_string())
+        .border(skim::tui::BorderType::Rounded)
+        .prompt("\u{276f} ".to_string())
+        .header(header)
+        .info(skim::tui::statusline::InfoDisplay::Inline)
+        .selector_icon("\u{25b8}".to_string())
         .ansi(true)
+        .color(
+            [
+                "fg:#D8DEE9",
+                "bg:#2E3440",
+                "hl:#88C0D0",
+                "fg+:#ECEFF4",
+                "bg+:#3B4252",
+                "hl+:#8FBCBB",
+                "info:#81A1C1",
+                "prompt:#A3BE8C",
+                "pointer:#BF616A",
+                "marker:#B48EAD",
+                "spinner:#81A1C1",
+                "header:#5E81AC",
+                "border:#4C566A",
+                "query:#ECEFF4",
+            ]
+            .join(","),
+        )
+        .bind(vec![
+            "ctrl-/:toggle-preview".to_string(),
+            "ctrl-u:half-page-up".to_string(),
+            "ctrl-d:half-page-down".to_string(),
+        ])
         .build()
         .expect("failed to build skim options");
 
