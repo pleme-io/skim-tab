@@ -32,6 +32,10 @@ path = "src/files.rs"
 name = "skim-content"
 path = "src/content.rs"
 
+[[bin]]
+name = "skim-cd"
+path = "src/cd.rs"
+
 [dependencies]
 skim = "3.7"
 regex = "1"

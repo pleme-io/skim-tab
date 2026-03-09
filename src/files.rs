@@ -19,7 +19,22 @@ use skim_tab::{base_options, parse_query, shell_quote, ICON_FILES, ICON_MARKER};
 fn discover_files() -> Result<String> {
     let output = Command::new("fd")
         .args([
-            "--type", "f", "--type", "d", "--hidden", "--follow", "--exclude", ".git",
+            "--type",
+            "f",
+            "--type",
+            "d",
+            "--hidden",
+            "--follow",
+            "--exclude",
+            ".git",
+            "--exclude",
+            "node_modules",
+            "--exclude",
+            "target",
+            "--exclude",
+            "__pycache__",
+            "--exclude",
+            ".direnv",
             "--strip-cwd-prefix",
         ])
         .output()
@@ -56,8 +71,8 @@ fn main() -> Result<()> {
         .prompt(ICON_FILES.to_string())
         .multi_select_icon(ICON_MARKER.to_string())
         .preview(preview_command())
-        .preview_window(PreviewLayout::from("right:50%:hidden:wrap"))
-        .header("Files/Dirs | TAB: Multi-select | CTRL-/: Toggle Preview".to_string())
+        .preview_window(PreviewLayout::from("right:50%:wrap"))
+        .header("TAB: Multi-select | CTRL-/: Toggle Preview | ESC: Cancel".to_string())
         .build()
         .expect("failed to build skim options");
 
