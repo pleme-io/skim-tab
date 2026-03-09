@@ -119,10 +119,10 @@ fn main() -> Result<()> {
             [
                 "fg:#D8DEE9",
                 "bg:#2E3440",
-                "hl:#88C0D0",
-                "fg+:#ECEFF4",
+                "hl:#88C0D0:bold:underlined",
+                "fg+:#ECEFF4:bold",
                 "bg+:#3B4252",
-                "hl+:#8FBCBB",
+                "hl+:#8FBCBB:bold:underlined",
                 "info:#81A1C1",
                 "prompt:#A3BE8C",
                 "pointer:#BF616A",
