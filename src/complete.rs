@@ -207,178 +207,287 @@ fn colorize(display: &str, candidate: &Candidate, ls_colors: &LsColors, command:
     }
 }
 
-// ── Description enrichment ──────────────────────────────────────────
+// ── Description registry ─────────────────────────────────────────────
+//
+// Table-driven description enrichment. To add a new tool:
+//   1. Add a ToolDescriptions entry to TOOL_REGISTRY
+//   2. That's it — lookup, coloring, icon, and preview all pick it up
+
+struct ToolDescriptions {
+    /// Command names that trigger this table (e.g., &["kubectl", "k"])
+    commands: &'static [&'static str],
+    /// Icon to use for the skim prompt (None = default pointer)
+    icon: Option<&'static str>,
+    /// (word, description) pairs for enrichment
+    entries: &'static [(&'static str, &'static str)],
+}
+
+impl ToolDescriptions {
+    fn matches(&self, command: &str) -> bool {
+        self.commands.contains(&command)
+    }
+
+    fn lookup(&self, word: &str) -> Option<&'static str> {
+        self.entries
+            .iter()
+            .find(|(w, _)| *w == word)
+            .map(|(_, d)| *d)
+    }
+}
+
+static TOOL_REGISTRY: &[ToolDescriptions] = &[
+    // ── kubectl ──────────────────────────────────────────────────
+    ToolDescriptions {
+        commands: &["kubectl", "kubecolor", "k"],
+        icon: Some(ICON_K8S),
+        entries: &[
+            // Subcommands
+            ("get", "Display resources"),
+            ("describe", "Show resource details"),
+            ("apply", "Apply configuration"),
+            ("delete", "Delete resources"),
+            ("edit", "Edit a resource"),
+            ("create", "Create from file or stdin"),
+            ("expose", "Expose as a service"),
+            ("run", "Run a pod"),
+            ("set", "Set resource fields"),
+            ("explain", "Documentation of resources"),
+            ("rollout", "Manage rollouts"),
+            ("scale", "Scale a resource"),
+            ("autoscale", "Auto-scale a resource"),
+            ("exec", "Execute in a container"),
+            ("logs", "Print container logs"),
+            ("attach", "Attach to a container"),
+            ("port-forward", "Forward ports to a pod"),
+            ("cp", "Copy files to/from containers"),
+            ("top", "Resource usage (CPU/memory)"),
+            ("debug", "Debug workloads"),
+            ("cordon", "Mark node unschedulable"),
+            ("uncordon", "Mark node schedulable"),
+            ("drain", "Drain a node"),
+            ("taint", "Set node taints"),
+            ("label", "Update labels"),
+            ("annotate", "Update annotations"),
+            ("patch", "Patch a resource"),
+            ("replace", "Replace a resource"),
+            ("wait", "Wait for a condition"),
+            ("config", "Modify kubeconfig"),
+            ("cluster-info", "Cluster endpoint info"),
+            ("api-resources", "List API resource types"),
+            ("api-versions", "List API versions"),
+            ("version", "Client and server version"),
+            ("diff", "Diff live vs applied"),
+            ("kustomize", "Build kustomization target"),
+            ("auth", "Inspect authorization"),
+            ("certificate", "Certificate operations"),
+            ("proxy", "API server proxy"),
+            ("plugin", "Plugin utilities"),
+            ("completion", "Shell completion"),
+            // Resource types (including abbreviations)
+            ("pods", "Pod workloads"),
+            ("pod", "Pod workloads"),
+            ("po", "Pod workloads"),
+            ("deployments", "Managed replicas"),
+            ("deployment", "Managed replicas"),
+            ("deploy", "Managed replicas"),
+            ("services", "Network endpoints"),
+            ("service", "Network endpoints"),
+            ("svc", "Network endpoints"),
+            ("nodes", "Cluster machines"),
+            ("node", "Cluster machines"),
+            ("no", "Cluster machines"),
+            ("namespaces", "Resource scopes"),
+            ("namespace", "Resource scopes"),
+            ("ns", "Resource scopes"),
+            ("configmaps", "Configuration data"),
+            ("configmap", "Configuration data"),
+            ("cm", "Configuration data"),
+            ("secrets", "Sensitive data"),
+            ("secret", "Sensitive data"),
+            ("ingresses", "External access rules"),
+            ("ingress", "External access rules"),
+            ("ing", "External access rules"),
+            ("persistentvolumeclaims", "Storage claims"),
+            ("pvc", "Storage claims"),
+            ("persistentvolumes", "Storage volumes"),
+            ("pv", "Storage volumes"),
+            ("statefulsets", "Stateful workloads"),
+            ("statefulset", "Stateful workloads"),
+            ("sts", "Stateful workloads"),
+            ("daemonsets", "Per-node workloads"),
+            ("daemonset", "Per-node workloads"),
+            ("ds", "Per-node workloads"),
+            ("jobs", "Run-to-completion tasks"),
+            ("job", "Run-to-completion tasks"),
+            ("cronjobs", "Scheduled jobs"),
+            ("cronjob", "Scheduled jobs"),
+            ("cj", "Scheduled jobs"),
+            ("replicasets", "Pod replica sets"),
+            ("replicaset", "Pod replica sets"),
+            ("rs", "Pod replica sets"),
+            ("serviceaccounts", "Identities for pods"),
+            ("serviceaccount", "Identities for pods"),
+            ("sa", "Identities for pods"),
+            ("roles", "Namespaced permissions"),
+            ("role", "Namespaced permissions"),
+            ("clusterroles", "Cluster-wide permissions"),
+            ("clusterrole", "Cluster-wide permissions"),
+            ("rolebindings", "Bind role to subject"),
+            ("rolebinding", "Bind role to subject"),
+            ("clusterrolebindings", "Cluster role binding"),
+            ("clusterrolebinding", "Cluster role binding"),
+            ("networkpolicies", "Network access rules"),
+            ("networkpolicy", "Network access rules"),
+            ("netpol", "Network access rules"),
+            ("storageclasses", "Storage provisioners"),
+            ("storageclass", "Storage provisioners"),
+            ("sc", "Storage provisioners"),
+            ("events", "Cluster events"),
+            ("event", "Cluster events"),
+            ("ev", "Cluster events"),
+            ("endpoints", "Service endpoints"),
+            ("ep", "Service endpoints"),
+            ("horizontalpodautoscalers", "Auto-scaling rules"),
+            ("hpa", "Auto-scaling rules"),
+            ("poddisruptionbudgets", "Disruption limits"),
+            ("pdb", "Disruption limits"),
+            ("limitranges", "Resource constraints"),
+            ("limitrange", "Resource constraints"),
+            ("limits", "Resource constraints"),
+            ("resourcequotas", "Namespace quotas"),
+            ("resourcequota", "Namespace quotas"),
+            ("quota", "Namespace quotas"),
+            ("customresourcedefinitions", "Custom API types"),
+            ("crd", "Custom API types"),
+            ("crds", "Custom API types"),
+        ],
+    },
+    // ── helm ─────────────────────────────────────────────────────
+    ToolDescriptions {
+        commands: &["helm"],
+        icon: Some(ICON_K8S),
+        entries: &[
+            ("install", "Install a chart"),
+            ("upgrade", "Upgrade a release"),
+            ("uninstall", "Uninstall a release"),
+            ("list", "List releases"),
+            ("ls", "List releases"),
+            ("status", "Release status"),
+            ("history", "Release history"),
+            ("rollback", "Rollback to a revision"),
+            ("template", "Render templates locally"),
+            ("show", "Show chart information"),
+            ("get", "Get release details"),
+            ("repo", "Manage chart repos"),
+            ("search", "Search for charts"),
+            ("pull", "Download a chart"),
+            ("push", "Push to a registry"),
+            ("package", "Package a chart"),
+            ("create", "Create a new chart"),
+            ("lint", "Lint a chart"),
+            ("test", "Test a release"),
+            ("dependency", "Manage dependencies"),
+            ("dep", "Manage dependencies"),
+            ("env", "Helm environment info"),
+            ("plugin", "Manage plugins"),
+            ("registry", "Registry operations"),
+            ("verify", "Verify a signed chart"),
+            ("version", "Client version"),
+            ("completion", "Shell completion"),
+            // show subcommands
+            ("chart", "Chart metadata"),
+            ("values", "Chart default values"),
+            ("readme", "Chart README"),
+            ("crds", "Chart CRDs"),
+            ("all", "All chart info"),
+        ],
+    },
+    // ── flux ─────────────────────────────────────────────────────
+    ToolDescriptions {
+        commands: &["flux"],
+        icon: Some(ICON_K8S),
+        entries: &[
+            ("get", "Display Flux resources"),
+            ("reconcile", "Trigger reconciliation"),
+            ("suspend", "Suspend reconciliation"),
+            ("resume", "Resume reconciliation"),
+            ("create", "Create Flux resources"),
+            ("delete", "Delete Flux resources"),
+            ("export", "Export resources as YAML"),
+            ("install", "Install Flux components"),
+            ("uninstall", "Uninstall Flux"),
+            ("bootstrap", "Bootstrap Flux on a cluster"),
+            ("check", "Pre-flight checks"),
+            ("logs", "Flux controller logs"),
+            ("events", "Flux events"),
+            ("tree", "Resource dependency tree"),
+            ("trace", "Trace a Flux resource"),
+            ("stats", "Reconciliation statistics"),
+            ("diff", "Diff live vs desired"),
+            ("build", "Build kustomization locally"),
+            ("push", "Push artifact to OCI"),
+            ("pull", "Pull artifact from OCI"),
+            ("tag", "Tag an OCI artifact"),
+            ("version", "Flux CLI version"),
+            ("completion", "Shell completion"),
+            // Resource types
+            ("kustomizations", "Kustomize reconciler"),
+            ("kustomization", "Kustomize reconciler"),
+            ("ks", "Kustomize reconciler"),
+            ("helmreleases", "Helm release reconciler"),
+            ("helmrelease", "Helm release reconciler"),
+            ("hr", "Helm release reconciler"),
+            ("gitrepositories", "Git source"),
+            ("gitrepository", "Git source"),
+            ("helmrepositories", "Helm chart source"),
+            ("helmrepository", "Helm chart source"),
+            ("helmcharts", "Helm chart artifact"),
+            ("helmchart", "Helm chart artifact"),
+            ("ocirepositories", "OCI artifact source"),
+            ("ocirepository", "OCI artifact source"),
+            ("buckets", "S3-compatible source"),
+            ("bucket", "S3-compatible source"),
+            ("receivers", "Webhook receiver"),
+            ("receiver", "Webhook receiver"),
+            ("alerts", "Alert rule"),
+            ("alert", "Alert rule"),
+            ("providers", "Notification provider"),
+            ("provider", "Notification provider"),
+            ("imagepolicies", "Image update policy"),
+            ("imagepolicy", "Image update policy"),
+            ("imagerepositories", "Image scan config"),
+            ("imagerepository", "Image scan config"),
+            ("imageupdateautomations", "Image auto-update"),
+            ("imageupdateautomation", "Image auto-update"),
+        ],
+    },
+    // ── Add new tools here ──────────────────────────────────────
+    // ToolDescriptions {
+    //     commands: &["docker", "podman"],
+    //     icon: None,  // uses default pointer
+    //     entries: &[
+    //         ("run", "Run a container"),
+    //         ("build", "Build an image"),
+    //         ...
+    //     ],
+    // },
+];
 
 /// Look up a built-in description for a candidate word.
-///
-/// Returns `None` if no enrichment is available — the candidate displays as-is.
-/// This is the central registry: add new tool descriptions here.
 fn lookup_description(word: &str, command: &str) -> Option<&'static str> {
     let base = command.split(':').next().unwrap_or(command);
-    match base {
-        "kubectl" | "kubecolor" | "k" => kubectl_desc(word),
-        "helm" => helm_desc(word),
-        "flux" => flux_desc(word),
-        _ => None,
-    }
+    TOOL_REGISTRY
+        .iter()
+        .find(|t| t.matches(base))
+        .and_then(|t| t.lookup(word))
 }
 
-fn kubectl_desc(word: &str) -> Option<&'static str> {
-    // Subcommands
-    match word {
-        "get" => Some("Display resources"),
-        "describe" => Some("Show resource details"),
-        "apply" => Some("Apply configuration"),
-        "delete" => Some("Delete resources"),
-        "edit" => Some("Edit a resource"),
-        "create" => Some("Create from file or stdin"),
-        "expose" => Some("Expose as a service"),
-        "run" => Some("Run a pod"),
-        "set" => Some("Set resource fields"),
-        "explain" => Some("Documentation of resources"),
-        "rollout" => Some("Manage rollouts"),
-        "scale" => Some("Scale a resource"),
-        "autoscale" => Some("Auto-scale a resource"),
-        "exec" => Some("Execute in a container"),
-        "logs" => Some("Print container logs"),
-        "attach" => Some("Attach to a container"),
-        "port-forward" => Some("Forward ports to a pod"),
-        "cp" => Some("Copy files to/from containers"),
-        "top" => Some("Resource usage (CPU/memory)"),
-        "debug" => Some("Debug workloads"),
-        "cordon" => Some("Mark node unschedulable"),
-        "uncordon" => Some("Mark node schedulable"),
-        "drain" => Some("Drain a node"),
-        "taint" => Some("Set node taints"),
-        "label" => Some("Update labels"),
-        "annotate" => Some("Update annotations"),
-        "patch" => Some("Patch a resource"),
-        "replace" => Some("Replace a resource"),
-        "wait" => Some("Wait for a condition"),
-        "config" => Some("Modify kubeconfig"),
-        "cluster-info" => Some("Cluster endpoint info"),
-        "api-resources" => Some("List API resource types"),
-        "api-versions" => Some("List API versions"),
-        "version" => Some("Client and server version"),
-        "diff" => Some("Diff live vs applied"),
-        "kustomize" => Some("Build kustomization target"),
-        "auth" => Some("Inspect authorization"),
-        "certificate" => Some("Certificate operations"),
-        "proxy" => Some("API server proxy"),
-        "plugin" => Some("Plugin utilities"),
-        "completion" => Some("Shell completion"),
-        // Resource types
-        "pods" | "pod" | "po" => Some("Pod workloads"),
-        "deployments" | "deployment" | "deploy" => Some("Managed replicas"),
-        "services" | "service" | "svc" => Some("Network endpoints"),
-        "nodes" | "node" | "no" => Some("Cluster machines"),
-        "namespaces" | "namespace" | "ns" => Some("Resource scopes"),
-        "configmaps" | "configmap" | "cm" => Some("Configuration data"),
-        "secrets" | "secret" => Some("Sensitive data"),
-        "ingresses" | "ingress" | "ing" => Some("External access rules"),
-        "persistentvolumeclaims" | "pvc" => Some("Storage claims"),
-        "persistentvolumes" | "pv" => Some("Storage volumes"),
-        "statefulsets" | "statefulset" | "sts" => Some("Stateful workloads"),
-        "daemonsets" | "daemonset" | "ds" => Some("Per-node workloads"),
-        "jobs" | "job" => Some("Run-to-completion tasks"),
-        "cronjobs" | "cronjob" | "cj" => Some("Scheduled jobs"),
-        "replicasets" | "replicaset" | "rs" => Some("Pod replica sets"),
-        "serviceaccounts" | "serviceaccount" | "sa" => Some("Identities for pods"),
-        "roles" | "role" => Some("Namespaced permissions"),
-        "clusterroles" | "clusterrole" => Some("Cluster-wide permissions"),
-        "rolebindings" | "rolebinding" => Some("Bind role to subject"),
-        "clusterrolebindings" | "clusterrolebinding" => Some("Cluster role binding"),
-        "networkpolicies" | "networkpolicy" | "netpol" => Some("Network access rules"),
-        "storageclasses" | "storageclass" | "sc" => Some("Storage provisioners"),
-        "events" | "event" | "ev" => Some("Cluster events"),
-        "endpoints" | "ep" => Some("Service endpoints"),
-        "horizontalpodautoscalers" | "hpa" => Some("Auto-scaling rules"),
-        "poddisruptionbudgets" | "pdb" => Some("Disruption limits"),
-        "limitranges" | "limitrange" | "limits" => Some("Resource constraints"),
-        "resourcequotas" | "resourcequota" | "quota" => Some("Namespace quotas"),
-        "customresourcedefinitions" | "crd" | "crds" => Some("Custom API types"),
-        _ => None,
-    }
-}
-
-fn helm_desc(word: &str) -> Option<&'static str> {
-    match word {
-        "install" => Some("Install a chart"),
-        "upgrade" => Some("Upgrade a release"),
-        "uninstall" => Some("Uninstall a release"),
-        "list" | "ls" => Some("List releases"),
-        "status" => Some("Release status"),
-        "history" => Some("Release history"),
-        "rollback" => Some("Rollback to a revision"),
-        "template" => Some("Render templates locally"),
-        "show" => Some("Show chart information"),
-        "get" => Some("Get release details"),
-        "repo" => Some("Manage chart repos"),
-        "search" => Some("Search for charts"),
-        "pull" => Some("Download a chart"),
-        "push" => Some("Push to a registry"),
-        "package" => Some("Package a chart"),
-        "create" => Some("Create a new chart"),
-        "lint" => Some("Lint a chart"),
-        "test" => Some("Test a release"),
-        "dependency" | "dep" => Some("Manage dependencies"),
-        "env" => Some("Helm environment info"),
-        "plugin" => Some("Manage plugins"),
-        "registry" => Some("Registry operations"),
-        "verify" => Some("Verify a signed chart"),
-        "version" => Some("Client version"),
-        "completion" => Some("Shell completion"),
-        // show subcommands
-        "chart" => Some("Chart metadata"),
-        "values" => Some("Chart default values"),
-        "readme" => Some("Chart README"),
-        "crds" => Some("Chart CRDs"),
-        "all" => Some("All chart info"),
-        _ => None,
-    }
-}
-
-fn flux_desc(word: &str) -> Option<&'static str> {
-    match word {
-        "get" => Some("Display Flux resources"),
-        "reconcile" => Some("Trigger reconciliation"),
-        "suspend" => Some("Suspend reconciliation"),
-        "resume" => Some("Resume reconciliation"),
-        "create" => Some("Create Flux resources"),
-        "delete" => Some("Delete Flux resources"),
-        "export" => Some("Export resources as YAML"),
-        "install" => Some("Install Flux components"),
-        "uninstall" => Some("Uninstall Flux"),
-        "bootstrap" => Some("Bootstrap Flux on a cluster"),
-        "check" => Some("Pre-flight checks"),
-        "logs" => Some("Flux controller logs"),
-        "events" => Some("Flux events"),
-        "tree" => Some("Resource dependency tree"),
-        "trace" => Some("Trace a Flux resource"),
-        "stats" => Some("Reconciliation statistics"),
-        "diff" => Some("Diff live vs desired"),
-        "build" => Some("Build kustomization locally"),
-        "push" => Some("Push artifact to OCI"),
-        "pull" => Some("Pull artifact from OCI"),
-        "tag" => Some("Tag an OCI artifact"),
-        "version" => Some("Flux CLI version"),
-        "completion" => Some("Shell completion"),
-        // Resource types
-        "kustomizations" | "kustomization" | "ks" => Some("Kustomize reconciler"),
-        "helmreleases" | "helmrelease" | "hr" => Some("Helm release reconciler"),
-        "gitrepositories" | "gitrepository" => Some("Git source"),
-        "helmrepositories" | "helmrepository" => Some("Helm chart source"),
-        "helmcharts" | "helmchart" => Some("Helm chart artifact"),
-        "ocirepositories" | "ocirepository" => Some("OCI artifact source"),
-        "buckets" | "bucket" => Some("S3-compatible source"),
-        "receivers" | "receiver" => Some("Webhook receiver"),
-        "alerts" | "alert" => Some("Alert rule"),
-        "providers" | "provider" => Some("Notification provider"),
-        "imagepolicies" | "imagepolicy" => Some("Image update policy"),
-        "imagerepositories" | "imagerepository" => Some("Image scan config"),
-        "imageupdateautomations" | "imageupdateautomation" => Some("Image auto-update"),
-        _ => None,
-    }
+/// Get the prompt icon for a command, or None for the default.
+fn tool_icon(command: &str) -> Option<&'static str> {
+    TOOL_REGISTRY
+        .iter()
+        .find(|t| t.matches(command))
+        .and_then(|t| t.icon)
 }
 
 // ── Output ───────────────────────────────────────────────────────────
@@ -424,12 +533,6 @@ fn completion_base_cmd(command: &str, buffer: &str) -> String {
         .to_string()
 }
 
-/// Check if the completion context is kubectl/helm/flux.
-fn is_k8s_context(command: &str, buffer: &str) -> bool {
-    let base = buffer.split_whitespace().next().unwrap_or(command);
-    matches!(base, "kubectl" | "kubecolor" | "k" | "helm" | "flux")
-}
-
 // ── Completion runner ────────────────────────────────────────────────
 
 fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
@@ -451,10 +554,10 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         .map(|c| colorize(c.display_text(), c, &ls_colors, &cmd_for_color))
         .collect();
 
+    let base_cmd = completion_base_cmd(&req.command, &req.buffer);
     let prompt = match req.command.as_str() {
         "cd" | "pushd" | "z" => ICON_CD,
-        _ if is_k8s_context(&req.command, &req.buffer) => ICON_K8S,
-        _ => ICON_POINTER,
+        _ => tool_icon(&base_cmd).unwrap_or(ICON_POINTER),
     };
 
     let mut builder = base_options(&req.query);
@@ -873,32 +976,32 @@ mod tests {
 
     #[test]
     fn lookup_description_kubectl() {
-        assert_eq!(kubectl_desc("pods"), Some("Pod workloads"));
-        assert_eq!(kubectl_desc("deploy"), Some("Managed replicas"));
-        assert_eq!(kubectl_desc("unknown-thing"), None);
+        assert_eq!(lookup_description("pods", "kubectl"), Some("Pod workloads"));
+        assert_eq!(lookup_description("deploy", "k"), Some("Managed replicas"));
+        assert_eq!(lookup_description("unknown-thing", "kubectl"), None);
     }
 
     #[test]
     fn lookup_description_helm() {
-        assert_eq!(helm_desc("upgrade"), Some("Upgrade a release"));
-        assert_eq!(helm_desc("nope"), None);
+        assert_eq!(lookup_description("upgrade", "helm"), Some("Upgrade a release"));
+        assert_eq!(lookup_description("nope", "helm"), None);
     }
 
     #[test]
     fn lookup_description_flux() {
-        assert_eq!(flux_desc("reconcile"), Some("Trigger reconciliation"));
-        assert_eq!(flux_desc("hr"), Some("Helm release reconciler"));
-        assert_eq!(flux_desc("nope"), None);
+        assert_eq!(lookup_description("reconcile", "flux"), Some("Trigger reconciliation"));
+        assert_eq!(lookup_description("hr", "flux"), Some("Helm release reconciler"));
+        assert_eq!(lookup_description("nope", "flux"), None);
     }
 
     #[test]
-    fn is_k8s_context_detects() {
-        assert!(is_k8s_context("kubectl", "kubectl get pods"));
-        assert!(is_k8s_context("", "helm install foo"));
-        assert!(is_k8s_context("", "flux get ks"));
-        assert!(is_k8s_context("k", "k get pods"));
-        assert!(!is_k8s_context("cd", "cd /tmp"));
-        assert!(!is_k8s_context("ls", "ls -la"));
+    fn tool_icon_registry() {
+        assert_eq!(tool_icon("kubectl"), Some(ICON_K8S));
+        assert_eq!(tool_icon("k"), Some(ICON_K8S));
+        assert_eq!(tool_icon("helm"), Some(ICON_K8S));
+        assert_eq!(tool_icon("flux"), Some(ICON_K8S));
+        assert_eq!(tool_icon("cd"), None);
+        assert_eq!(tool_icon("ls"), None);
     }
 
     #[test]
