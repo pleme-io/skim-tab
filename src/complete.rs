@@ -5,7 +5,7 @@
 //!   2. `--compcap` mode: reads NUL/STX compcap format on stdin,
 //!      with `--command`, `--query`, `--buffer` as CLI args (for the zsh widget)
 
-use crate::{base_options, ICON_CD, ICON_POINTER};
+use crate::{base_options, ANSI_DIM, ANSI_FROST, ANSI_RESET, ANSI_YELLOW, ICON_CD, ICON_K8S, ICON_POINTER};
 use lscolors::LsColors;
 use serde::{Deserialize, Serialize};
 use skim::prelude::*;
@@ -164,19 +164,221 @@ fn parse_compcap(data: &[u8], command: &str, query: &str, buffer: &str) -> Compl
 
 // ── Colorize ─────────────────────────────────────────────────────────
 
-fn colorize(display: &str, candidate: &Candidate, ls_colors: &LsColors) -> String {
-    if !candidate.is_file {
-        return display.to_string();
+/// Apply Nord-themed ANSI coloring to a completion candidate.
+///
+/// - File candidates: lscolors (directories blue, executables green, etc.)
+/// - Non-file with ` -- ` description: word in accent, description in dim
+/// - Flags (`--foo`): yellow
+/// - Everything else: frost accent
+///
+/// The text structure is preserved so that `strip_ansi(colored) == display`.
+fn colorize(display: &str, candidate: &Candidate, ls_colors: &LsColors, command: &str) -> String {
+    if candidate.is_file {
+        let path = if candidate.realdir.is_empty() {
+            display.to_string()
+        } else {
+            format!("{}{display}", candidate.realdir)
+        };
+        return ls_colors
+            .style_for_path(&path)
+            .map(|s| s.to_nu_ansi_term_style().paint(display).to_string())
+            .unwrap_or_else(|| display.to_string());
     }
-    let path = if candidate.realdir.is_empty() {
-        display.to_string()
+
+    // Enrich candidates that have no description with built-in ones
+    let enriched;
+    let text = if display.contains(" -- ") {
+        display
+    } else if let Some(desc) = lookup_description(display, command) {
+        enriched = format!("{display} -- {desc}");
+        &enriched
     } else {
-        format!("{}{display}", candidate.realdir)
+        display
     };
-    ls_colors
-        .style_for_path(&path)
-        .map(|s| s.to_nu_ansi_term_style().paint(display).to_string())
-        .unwrap_or_else(|| display.to_string())
+
+    // Parse "word -- description" and apply colors
+    if let Some((word, desc)) = text.split_once(" -- ") {
+        let wc = if word.starts_with('-') { ANSI_YELLOW } else { ANSI_FROST };
+        format!("{wc}{word}{ANSI_RESET} {ANSI_DIM}-- {desc}{ANSI_RESET}")
+    } else if text.starts_with('-') {
+        format!("{ANSI_YELLOW}{text}{ANSI_RESET}")
+    } else {
+        format!("{ANSI_FROST}{text}{ANSI_RESET}")
+    }
+}
+
+// ── Description enrichment ──────────────────────────────────────────
+
+/// Look up a built-in description for a candidate word.
+///
+/// Returns `None` if no enrichment is available — the candidate displays as-is.
+/// This is the central registry: add new tool descriptions here.
+fn lookup_description(word: &str, command: &str) -> Option<&'static str> {
+    let base = command.split(':').next().unwrap_or(command);
+    match base {
+        "kubectl" | "kubecolor" | "k" => kubectl_desc(word),
+        "helm" => helm_desc(word),
+        "flux" => flux_desc(word),
+        _ => None,
+    }
+}
+
+fn kubectl_desc(word: &str) -> Option<&'static str> {
+    // Subcommands
+    match word {
+        "get" => Some("Display resources"),
+        "describe" => Some("Show resource details"),
+        "apply" => Some("Apply configuration"),
+        "delete" => Some("Delete resources"),
+        "edit" => Some("Edit a resource"),
+        "create" => Some("Create from file or stdin"),
+        "expose" => Some("Expose as a service"),
+        "run" => Some("Run a pod"),
+        "set" => Some("Set resource fields"),
+        "explain" => Some("Documentation of resources"),
+        "rollout" => Some("Manage rollouts"),
+        "scale" => Some("Scale a resource"),
+        "autoscale" => Some("Auto-scale a resource"),
+        "exec" => Some("Execute in a container"),
+        "logs" => Some("Print container logs"),
+        "attach" => Some("Attach to a container"),
+        "port-forward" => Some("Forward ports to a pod"),
+        "cp" => Some("Copy files to/from containers"),
+        "top" => Some("Resource usage (CPU/memory)"),
+        "debug" => Some("Debug workloads"),
+        "cordon" => Some("Mark node unschedulable"),
+        "uncordon" => Some("Mark node schedulable"),
+        "drain" => Some("Drain a node"),
+        "taint" => Some("Set node taints"),
+        "label" => Some("Update labels"),
+        "annotate" => Some("Update annotations"),
+        "patch" => Some("Patch a resource"),
+        "replace" => Some("Replace a resource"),
+        "wait" => Some("Wait for a condition"),
+        "config" => Some("Modify kubeconfig"),
+        "cluster-info" => Some("Cluster endpoint info"),
+        "api-resources" => Some("List API resource types"),
+        "api-versions" => Some("List API versions"),
+        "version" => Some("Client and server version"),
+        "diff" => Some("Diff live vs applied"),
+        "kustomize" => Some("Build kustomization target"),
+        "auth" => Some("Inspect authorization"),
+        "certificate" => Some("Certificate operations"),
+        "proxy" => Some("API server proxy"),
+        "plugin" => Some("Plugin utilities"),
+        "completion" => Some("Shell completion"),
+        // Resource types
+        "pods" | "pod" | "po" => Some("Pod workloads"),
+        "deployments" | "deployment" | "deploy" => Some("Managed replicas"),
+        "services" | "service" | "svc" => Some("Network endpoints"),
+        "nodes" | "node" | "no" => Some("Cluster machines"),
+        "namespaces" | "namespace" | "ns" => Some("Resource scopes"),
+        "configmaps" | "configmap" | "cm" => Some("Configuration data"),
+        "secrets" | "secret" => Some("Sensitive data"),
+        "ingresses" | "ingress" | "ing" => Some("External access rules"),
+        "persistentvolumeclaims" | "pvc" => Some("Storage claims"),
+        "persistentvolumes" | "pv" => Some("Storage volumes"),
+        "statefulsets" | "statefulset" | "sts" => Some("Stateful workloads"),
+        "daemonsets" | "daemonset" | "ds" => Some("Per-node workloads"),
+        "jobs" | "job" => Some("Run-to-completion tasks"),
+        "cronjobs" | "cronjob" | "cj" => Some("Scheduled jobs"),
+        "replicasets" | "replicaset" | "rs" => Some("Pod replica sets"),
+        "serviceaccounts" | "serviceaccount" | "sa" => Some("Identities for pods"),
+        "roles" | "role" => Some("Namespaced permissions"),
+        "clusterroles" | "clusterrole" => Some("Cluster-wide permissions"),
+        "rolebindings" | "rolebinding" => Some("Bind role to subject"),
+        "clusterrolebindings" | "clusterrolebinding" => Some("Cluster role binding"),
+        "networkpolicies" | "networkpolicy" | "netpol" => Some("Network access rules"),
+        "storageclasses" | "storageclass" | "sc" => Some("Storage provisioners"),
+        "events" | "event" | "ev" => Some("Cluster events"),
+        "endpoints" | "ep" => Some("Service endpoints"),
+        "horizontalpodautoscalers" | "hpa" => Some("Auto-scaling rules"),
+        "poddisruptionbudgets" | "pdb" => Some("Disruption limits"),
+        "limitranges" | "limitrange" | "limits" => Some("Resource constraints"),
+        "resourcequotas" | "resourcequota" | "quota" => Some("Namespace quotas"),
+        "customresourcedefinitions" | "crd" | "crds" => Some("Custom API types"),
+        _ => None,
+    }
+}
+
+fn helm_desc(word: &str) -> Option<&'static str> {
+    match word {
+        "install" => Some("Install a chart"),
+        "upgrade" => Some("Upgrade a release"),
+        "uninstall" => Some("Uninstall a release"),
+        "list" | "ls" => Some("List releases"),
+        "status" => Some("Release status"),
+        "history" => Some("Release history"),
+        "rollback" => Some("Rollback to a revision"),
+        "template" => Some("Render templates locally"),
+        "show" => Some("Show chart information"),
+        "get" => Some("Get release details"),
+        "repo" => Some("Manage chart repos"),
+        "search" => Some("Search for charts"),
+        "pull" => Some("Download a chart"),
+        "push" => Some("Push to a registry"),
+        "package" => Some("Package a chart"),
+        "create" => Some("Create a new chart"),
+        "lint" => Some("Lint a chart"),
+        "test" => Some("Test a release"),
+        "dependency" | "dep" => Some("Manage dependencies"),
+        "env" => Some("Helm environment info"),
+        "plugin" => Some("Manage plugins"),
+        "registry" => Some("Registry operations"),
+        "verify" => Some("Verify a signed chart"),
+        "version" => Some("Client version"),
+        "completion" => Some("Shell completion"),
+        // show subcommands
+        "chart" => Some("Chart metadata"),
+        "values" => Some("Chart default values"),
+        "readme" => Some("Chart README"),
+        "crds" => Some("Chart CRDs"),
+        "all" => Some("All chart info"),
+        _ => None,
+    }
+}
+
+fn flux_desc(word: &str) -> Option<&'static str> {
+    match word {
+        "get" => Some("Display Flux resources"),
+        "reconcile" => Some("Trigger reconciliation"),
+        "suspend" => Some("Suspend reconciliation"),
+        "resume" => Some("Resume reconciliation"),
+        "create" => Some("Create Flux resources"),
+        "delete" => Some("Delete Flux resources"),
+        "export" => Some("Export resources as YAML"),
+        "install" => Some("Install Flux components"),
+        "uninstall" => Some("Uninstall Flux"),
+        "bootstrap" => Some("Bootstrap Flux on a cluster"),
+        "check" => Some("Pre-flight checks"),
+        "logs" => Some("Flux controller logs"),
+        "events" => Some("Flux events"),
+        "tree" => Some("Resource dependency tree"),
+        "trace" => Some("Trace a Flux resource"),
+        "stats" => Some("Reconciliation statistics"),
+        "diff" => Some("Diff live vs desired"),
+        "build" => Some("Build kustomization locally"),
+        "push" => Some("Push artifact to OCI"),
+        "pull" => Some("Pull artifact from OCI"),
+        "tag" => Some("Tag an OCI artifact"),
+        "version" => Some("Flux CLI version"),
+        "completion" => Some("Shell completion"),
+        // Resource types
+        "kustomizations" | "kustomization" | "ks" => Some("Kustomize reconciler"),
+        "helmreleases" | "helmrelease" | "hr" => Some("Helm release reconciler"),
+        "gitrepositories" | "gitrepository" => Some("Git source"),
+        "helmrepositories" | "helmrepository" => Some("Helm chart source"),
+        "helmcharts" | "helmchart" => Some("Helm chart artifact"),
+        "ocirepositories" | "ocirepository" => Some("OCI artifact source"),
+        "buckets" | "bucket" => Some("S3-compatible source"),
+        "receivers" | "receiver" => Some("Webhook receiver"),
+        "alerts" | "alert" => Some("Alert rule"),
+        "providers" | "provider" => Some("Notification provider"),
+        "imagepolicies" | "imagepolicy" => Some("Image update policy"),
+        "imagerepositories" | "imagerepository" => Some("Image scan config"),
+        "imageupdateautomations" | "imageupdateautomation" => Some("Image auto-update"),
+        _ => None,
+    }
 }
 
 // ── Output ───────────────────────────────────────────────────────────
@@ -209,6 +411,25 @@ fn print_response(action: &str, selections: &[Selection], mode: OutputMode) {
     }
 }
 
+// ── Context helpers ──────────────────────────────────────────────────
+
+/// Extract the base command for color/description lookups.
+/// Prefers the buffer's first word (the actual command typed) over
+/// the zsh curcontext command name.
+fn completion_base_cmd(command: &str, buffer: &str) -> String {
+    buffer
+        .split_whitespace()
+        .next()
+        .unwrap_or(command)
+        .to_string()
+}
+
+/// Check if the completion context is kubectl/helm/flux.
+fn is_k8s_context(command: &str, buffer: &str) -> bool {
+    let base = buffer.split_whitespace().next().unwrap_or(command);
+    matches!(base, "kubectl" | "kubecolor" | "k" | "helm" | "flux")
+}
+
 // ── Completion runner ────────────────────────────────────────────────
 
 fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
@@ -223,14 +444,16 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
     }
 
     let ls_colors = LsColors::from_env().unwrap_or_default();
+    let cmd_for_color = completion_base_cmd(&req.command, &req.buffer);
     let display_lines: Vec<String> = req
         .candidates
         .iter()
-        .map(|c| colorize(c.display_text(), c, &ls_colors))
+        .map(|c| colorize(c.display_text(), c, &ls_colors, &cmd_for_color))
         .collect();
 
     let prompt = match req.command.as_str() {
         "cd" | "pushd" | "z" => ICON_CD,
+        _ if is_k8s_context(&req.command, &req.buffer) => ICON_K8S,
         _ => ICON_POINTER,
     };
 
@@ -310,9 +533,12 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         .iter()
         .filter_map(|text| {
             let plain = crate::strip_ansi(text);
+            // Match against original display, or the word part before " -- "
+            // (enriched descriptions add " -- desc" that isn't in display_text)
+            let match_text = plain.split(" -- ").next().unwrap_or(&plain);
             req.candidates
                 .iter()
-                .find(|c| c.display_text() == plain)
+                .find(|c| c.display_text() == plain || c.display_text() == match_text)
                 .map(Candidate::to_selection)
         })
         .collect();
@@ -560,5 +786,125 @@ mod tests {
             .map(String::from)
             .collect();
         assert_eq!(parse_kv_arg(&args, "--query"), "");
+    }
+
+    #[test]
+    fn colorize_file_candidate() {
+        let ls = LsColors::from_env().unwrap_or_default();
+        let c = Candidate {
+            word: "src".into(),
+            is_file: true,
+            realdir: "/tmp/".into(),
+            ..Default::default()
+        };
+        // Should not panic and should return something non-empty
+        let result = colorize("src", &c, &ls, "ls");
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn colorize_non_file_with_description() {
+        let ls = LsColors::default();
+        let c = Candidate::default();
+        let result = colorize("get -- Display resources", &c, &ls, "kubectl");
+        // Should contain ANSI codes
+        assert!(result.contains('\x1b'));
+        // Stripped should match original
+        assert_eq!(crate::strip_ansi(&result), "get -- Display resources");
+    }
+
+    #[test]
+    fn colorize_flag() {
+        let ls = LsColors::default();
+        let c = Candidate::default();
+        let result = colorize("--namespace", &c, &ls, "kubectl");
+        assert!(result.contains('\x1b'));
+        assert_eq!(crate::strip_ansi(&result), "--namespace");
+    }
+
+    #[test]
+    fn colorize_flag_with_description() {
+        let ls = LsColors::default();
+        let c = Candidate::default();
+        let result = colorize("--output -- Output format", &c, &ls, "kubectl");
+        assert!(result.contains(ANSI_YELLOW));
+        assert_eq!(crate::strip_ansi(&result), "--output -- Output format");
+    }
+
+    #[test]
+    fn colorize_enriches_kubectl_subcommand() {
+        let ls = LsColors::default();
+        let c = Candidate { word: "get".into(), display: "get".into(), ..Default::default() };
+        let result = colorize("get", &c, &ls, "kubectl");
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("get"));
+        assert!(stripped.contains(" -- "));
+        assert!(stripped.contains("Display resources"));
+    }
+
+    #[test]
+    fn colorize_enriches_helm_subcommand() {
+        let ls = LsColors::default();
+        let c = Candidate::default();
+        let result = colorize("install", &c, &ls, "helm");
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("install"));
+        assert!(stripped.contains(" -- "));
+        assert!(stripped.contains("Install a chart"));
+    }
+
+    #[test]
+    fn colorize_enriches_flux_resource_type() {
+        let ls = LsColors::default();
+        let c = Candidate::default();
+        let result = colorize("kustomizations", &c, &ls, "flux");
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("Kustomize reconciler"));
+    }
+
+    #[test]
+    fn colorize_no_enrichment_for_unknown() {
+        let ls = LsColors::default();
+        let c = Candidate::default();
+        let result = colorize("my-random-pod", &c, &ls, "kubectl");
+        let stripped = crate::strip_ansi(&result);
+        assert_eq!(stripped, "my-random-pod");
+    }
+
+    #[test]
+    fn lookup_description_kubectl() {
+        assert_eq!(kubectl_desc("pods"), Some("Pod workloads"));
+        assert_eq!(kubectl_desc("deploy"), Some("Managed replicas"));
+        assert_eq!(kubectl_desc("unknown-thing"), None);
+    }
+
+    #[test]
+    fn lookup_description_helm() {
+        assert_eq!(helm_desc("upgrade"), Some("Upgrade a release"));
+        assert_eq!(helm_desc("nope"), None);
+    }
+
+    #[test]
+    fn lookup_description_flux() {
+        assert_eq!(flux_desc("reconcile"), Some("Trigger reconciliation"));
+        assert_eq!(flux_desc("hr"), Some("Helm release reconciler"));
+        assert_eq!(flux_desc("nope"), None);
+    }
+
+    #[test]
+    fn is_k8s_context_detects() {
+        assert!(is_k8s_context("kubectl", "kubectl get pods"));
+        assert!(is_k8s_context("", "helm install foo"));
+        assert!(is_k8s_context("", "flux get ks"));
+        assert!(is_k8s_context("k", "k get pods"));
+        assert!(!is_k8s_context("cd", "cd /tmp"));
+        assert!(!is_k8s_context("ls", "ls -la"));
+    }
+
+    #[test]
+    fn completion_base_cmd_prefers_buffer() {
+        assert_eq!(completion_base_cmd("", "kubectl get pods"), "kubectl");
+        assert_eq!(completion_base_cmd("helm", ""), "helm");
+        assert_eq!(completion_base_cmd("cd", "cd /tmp"), "cd");
     }
 }

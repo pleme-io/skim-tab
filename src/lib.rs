@@ -56,6 +56,25 @@ pub const ICON_MARKER: &str = "\u{25c6}"; // ◆ (diamond — selected)
 /// Prompt: directory navigation — nav arrow
 pub const ICON_CD: &str = "\u{25b8} "; // ▸ (right triangle — navigate)
 
+/// Prompt: Kubernetes / Helm / Flux — helm wheel
+pub const ICON_K8S: &str = "\u{2388} "; // ⎈ (helm — k8s)
+
+// ── Nord ANSI true-color escapes ─────────────────────────────────────
+// Used by colorize and preview to give non-file completions a themed look.
+
+/// Nord frost (#88C0D0) — primary accent for completion items
+pub const ANSI_FROST: &str = "\x1b[38;2;136;192;208m";
+/// Nord yellow (#EBCB8B) — flags and options
+pub const ANSI_YELLOW: &str = "\x1b[38;2;235;203;139m";
+/// Nord dim (#4C566A) — descriptions and separators
+pub const ANSI_DIM: &str = "\x1b[38;2;76;86;106m";
+/// Nord green (#A3BE8C) — success / active items
+pub const ANSI_GREEN: &str = "\x1b[38;2;163;190;140m";
+/// Nord purple (#B48EAD) — types / categories
+pub const ANSI_PURPLE: &str = "\x1b[38;2;180;142;173m";
+/// ANSI reset
+pub const ANSI_RESET: &str = "\x1b[0m";
+
 /// Extract `--query <value>` from CLI args, returning empty string if absent.
 pub fn parse_query(args: &[String]) -> &str {
     args.iter()
