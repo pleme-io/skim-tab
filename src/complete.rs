@@ -222,18 +222,13 @@ fn colorize(
     let lookup_word = display.trim_end_matches('/');
 
     // Build enriched description from static + live data.
-    let enriched;
-    let text = if display.contains(" -- ") {
-        display
+    let enriched = if display.contains(" -- ") {
+        None
     } else {
-        let desc = build_description(lookup_word, command, k8s);
-        if let Some(d) = desc {
-            enriched = format!("{display} -- {d}");
-            &enriched
-        } else {
-            display
-        }
+        build_description(lookup_word, command, k8s)
+            .map(|d| format!("{display} -- {d}"))
     };
+    let text = enriched.as_deref().unwrap_or(display);
 
     // Parse "word -- description" and apply colors
     if let Some((word, desc)) = text.split_once(" -- ") {
@@ -261,27 +256,17 @@ fn build_description(word: &str, command: &str, k8s: &K8sEnrichment) -> Option<S
 
     // Phase 2: live resource count
     if let Some(&count) = k8s.resource_counts.get(word) {
-        parts.push(format!("{count}"));
+        parts.push(count.to_string());
     }
 
     // Phase 3: namespace enrichment
     if !k8s.active_ns.is_empty() {
-        let mut ns_parts: Vec<&str> = Vec::new();
-        if word == k8s.active_ns {
-            ns_parts.push("active");
-        }
-        if let Some(&count) = k8s.ns_pod_counts.get(word) {
-            // Use a leaked string for the count — this runs once per completion
-            let s = format!("{count} pods");
-            parts.push(
-                if ns_parts.is_empty() {
-                    s
-                } else {
-                    format!("{}, {s}", ns_parts.join(", "))
-                },
-            );
-        } else if !ns_parts.is_empty() {
-            parts.push(ns_parts.join(", ").to_string());
+        let is_active = word == k8s.active_ns;
+        match (is_active, k8s.ns_pod_counts.get(word)) {
+            (true, Some(&count)) => parts.push(format!("active, {count} pods")),
+            (true, None) => parts.push("active".to_string()),
+            (false, Some(&count)) => parts.push(format!("{count} pods")),
+            (false, None) => {}
         }
     }
 
