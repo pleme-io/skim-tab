@@ -78,17 +78,7 @@ pub struct Selection {
     pub args: String,
 }
 
-// ── Display item for skim ───────────────────────────────────────────────
-
-struct CompItem {
-    display: String,
-}
-
-impl SkimItem for CompItem {
-    fn text(&self) -> Cow<'_, str> {
-        Cow::Borrowed(&self.display)
-    }
-}
+// (Items are fed through SkimItemReader for proper ANSI color support)
 
 // ── Compcap parser ──────────────────────────────────────────────────────
 
@@ -183,8 +173,13 @@ fn preview_candidate(candidate: &Candidate, command: &str) -> String {
     };
 
     match command {
+        // Directory navigation → tree view
         "cd" | "pushd" | "z" => preview_dir(&path),
+
+        // Process management → process info
         "kill" | "ps" => preview_proc(word),
+
+        // Git subcommands → relevant git output
         cmd if cmd.starts_with("git-add")
             || cmd.starts_with("git-diff")
             || cmd.starts_with("git-restore") =>
@@ -193,16 +188,87 @@ fn preview_candidate(candidate: &Candidate, command: &str) -> String {
         }
         cmd if cmd.starts_with("git-log") => preview_git("log", word),
         cmd if cmd.starts_with("git-checkout") => preview_git("checkout", word),
+
+        // Package managers → package info
+        "brew" | "nix" | "cargo" | "npm" | "pip" => preview_command(word),
+
+        // SSH/systemctl/docker → contextual help
+        "ssh" => preview_command("ssh"),
+        "systemctl" => preview_command(word),
+        "docker" | "kubectl" | "helm" | "flux" => preview_command(word),
+
+        // Empty command → completing a command name (first word on line)
+        "" => {
+            if Path::new(&path).is_dir() {
+                preview_dir(&path)
+            } else if Path::new(&path).is_file() {
+                preview_file(&path)
+            } else {
+                // Completing a command → show tldr/man
+                preview_command(word)
+            }
+        }
+
+        // Default: try file/dir, fall back to command help for the word
         _ => {
             if Path::new(&path).is_dir() {
                 preview_dir(&path)
             } else if Path::new(&path).is_file() {
                 preview_file(&path)
             } else {
-                String::new()
+                // For flags/options, show help for the parent command
+                if word.starts_with('-') {
+                    preview_command_help(command, word)
+                } else {
+                    // Could be a subcommand or argument — try tldr for the word
+                    let result = preview_command(word);
+                    if result.is_empty() {
+                        preview_command(command)
+                    } else {
+                        result
+                    }
+                }
             }
         }
     }
+}
+
+/// Preview a command using tldr (tealdeer) with fallback to man --help
+fn preview_command(cmd: &str) -> String {
+    // Try tldr first (fast, colorized, concise)
+    let tldr = Command::new("tldr")
+        .args(["--color=always", cmd])
+        .output();
+    if let Ok(out) = &tldr {
+        if out.status.success() && !out.stdout.is_empty() {
+            return String::from_utf8_lossy(&out.stdout).into_owned();
+        }
+    }
+
+    // Fall back to --help (many commands support this)
+    let help = Command::new(cmd)
+        .arg("--help")
+        .output();
+    if let Ok(out) = &help {
+        let text = if out.stdout.is_empty() {
+            String::from_utf8_lossy(&out.stderr).into_owned()
+        } else {
+            String::from_utf8_lossy(&out.stdout).into_owned()
+        };
+        if !text.is_empty() {
+            // Truncate to ~80 lines for preview readability
+            let truncated: String = text.lines().take(80).collect::<Vec<_>>().join("\n");
+            return truncated;
+        }
+    }
+
+    String::new()
+}
+
+/// Preview help for a specific flag/option of a command
+fn preview_command_help(cmd: &str, _flag: &str) -> String {
+    // Show the command's help — the user can see what flags are available
+    preview_command(cmd)
 }
 
 fn preview_dir(path: &str) -> String {
@@ -318,7 +384,8 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
 
     let ls_colors = LsColors::from_env().unwrap_or_default();
 
-    let items: Vec<Arc<dyn SkimItem>> = req
+    // Build colorized display strings for skim
+    let display_lines: Vec<String> = req
         .candidates
         .iter()
         .map(|c| {
@@ -327,8 +394,7 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
             } else {
                 &c.display
             };
-            let colored = colorize(display, c, &ls_colors);
-            Arc::new(CompItem { display: colored }) as Arc<dyn SkimItem>
+            colorize(display, c, &ls_colors)
         })
         .collect();
 
@@ -381,12 +447,12 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         }
     };
 
-    let display_strings: Vec<String> = items
-        .iter()
-        .map(|item| item.text().into_owned())
-        .collect();
+    // Feed items through SkimItemReader (handles ANSI color processing)
+    let items_text = display_lines.join("\n");
+    let item_reader = SkimItemReader::default();
+    let items = item_reader.of_bufread(io::Cursor::new(items_text));
 
-    let output = match Skim::run_items(skim_opts, display_strings) {
+    let output = match Skim::run_with(skim_opts, Some(items)) {
         Ok(o) => o,
         Err(e) => {
             eprintln!("skim-tab --complete: skim error: {e}");
@@ -402,7 +468,7 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         return;
     }
 
-    let selected_items = if output.selected_items.is_empty() {
+    let selected_items: Vec<String> = if output.selected_items.is_empty() {
         output
             .current
             .as_ref()
