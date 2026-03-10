@@ -5823,6 +5823,38 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
+      "serde_yaml" = rec {
+        crateName = "serde_yaml";
+        version = "0.9.34+deprecated";
+        edition = "2021";
+        sha256 = "0isba1fjyg3l6rxk156k600ilzr8fp7crv82rhal0rxz5qd1m2va";
+        authors = [
+          "David Tolnay <dtolnay@gmail.com>"
+        ];
+        dependencies = [
+          {
+            name = "indexmap";
+            packageId = "indexmap";
+          }
+          {
+            name = "itoa";
+            packageId = "itoa";
+          }
+          {
+            name = "ryu";
+            packageId = "ryu";
+          }
+          {
+            name = "serde";
+            packageId = "serde";
+          }
+          {
+            name = "unsafe-libyaml";
+            packageId = "unsafe-libyaml";
+          }
+        ];
+
+      };
       "serial2" = rec {
         crateName = "serial2";
         version = "0.2.34";
@@ -6370,6 +6402,10 @@ rec {
           {
             name = "serde_json";
             packageId = "serde_json";
+          }
+          {
+            name = "serde_yaml";
+            packageId = "serde_yaml";
           }
           {
             name = "skim";
@@ -7611,6 +7647,18 @@ rec {
         features = {
         };
         resolvedDefaultFeatures = [ "default" ];
+      };
+      "unsafe-libyaml" = rec {
+        crateName = "unsafe-libyaml";
+        version = "0.2.11";
+        edition = "2021";
+        crateBin = [];
+        sha256 = "0qdq69ffl3v5pzx9kzxbghzn0fzn266i1xn70y88maybz9csqfk7";
+        libName = "unsafe_libyaml";
+        authors = [
+          "David Tolnay <dtolnay@gmail.com>"
+        ];
+
       };
       "utf8parse" = rec {
         crateName = "utf8parse";
