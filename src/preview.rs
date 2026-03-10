@@ -141,10 +141,7 @@ fn preview_kubectl(ctx: &BufferContext, candidate: &str) -> String {
         }
         "apply" | "create" => try_path_then_command(candidate, candidate),
         "" if candidate.starts_with('-') => preview_command("kubectl"),
-        "" => {
-            let tldr = preview_command(&format!("kubectl-{candidate}"));
-            if tldr.is_empty() { preview_command("kubectl") } else { tldr }
-        }
+        "" => preview_subcommand("kubectl", candidate),
         _ => preview_command("kubectl"),
     }
 }
@@ -171,6 +168,8 @@ fn preview_flux(ctx: &BufferContext, candidate: &str) -> String {
         }
         "logs" => run("flux", &["logs", "--tail=30"]),
         "events" => run("flux", &["events", "--for", candidate]),
+        "" if candidate.starts_with('-') => preview_command("flux"),
+        "" => preview_subcommand("flux", candidate),
         _ => preview_command("flux"),
     }
 }
@@ -195,8 +194,28 @@ fn preview_helm(ctx: &BufferContext, candidate: &str) -> String {
             truncated("helm", &["show", sub1, candidate], 60)
         }
         "repo" => run("helm", &["repo", "list"]),
+        "" if candidate.starts_with('-') => preview_command("helm"),
+        "" => preview_subcommand("helm", candidate),
         _ => preview_command("helm"),
     }
+}
+
+// ── Subcommand previewer ─────────────────────────────────────────────
+
+/// Preview a tool's subcommand: try `tool subcmd --help`, then tldr, then generic.
+fn preview_subcommand(tool: &str, subcmd: &str) -> String {
+    // Try the specific subcommand help (e.g., `kubectl get --help`)
+    let help = run(tool, &[subcmd, "--help"]);
+    if !help.is_empty() {
+        return help.lines().take(50).collect::<Vec<_>>().join("\n");
+    }
+    // Try tldr (e.g., `tldr kubectl-get`)
+    let tldr = preview_command(&format!("{tool}-{subcmd}"));
+    if !tldr.is_empty() {
+        return tldr;
+    }
+    // Fallback to generic tool help
+    preview_command(tool)
 }
 
 // ── Generic previewers ───────────────────────────────────────────────
