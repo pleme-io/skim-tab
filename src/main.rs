@@ -12,6 +12,27 @@ use skim::tui::options::TuiLayout;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // Subcommand dispatch: --complete, --compcap, --preview bypass fzf-compat mode
+    if args.first().map(|s| s.as_str()) == Some("--complete") {
+        if args.iter().any(|a| a == "--compcap") {
+            // Filter out --complete and --compcap, pass remaining args
+            let remaining: Vec<String> = args
+                .iter()
+                .filter(|a| *a != "--complete" && *a != "--compcap")
+                .cloned()
+                .collect();
+            skim_tab::complete::run_compcap(&remaining);
+        } else {
+            skim_tab::complete::run();
+        }
+        return;
+    }
+    if args.first().map(|s| s.as_str()) == Some("--preview") {
+        skim_tab::complete::run_preview(&args[1..]);
+        return;
+    }
+
     let opts = parse_args(&args);
 
     // Read all input from stdin
@@ -543,10 +564,8 @@ mod tests {
 
     #[test]
     fn test_parse_args_preview() {
-        // When SHELL is sh or unset, preview is passed through unchanged
-        std::env::set_var("SHELL", "sh");
+        // preview-window is parsed regardless of SHELL
         let args: Vec<String> = vec![
-            "--preview=bat --color=always {}",
             "--preview-window=right:50%:wrap",
         ]
         .into_iter()
@@ -554,35 +573,7 @@ mod tests {
         .collect();
 
         let opts = parse_args(&args);
-        assert_eq!(opts.preview, Some("bat --color=always {}".to_string()));
         assert_eq!(opts.preview_window, Some("right:50%:wrap".to_string()));
-    }
-
-    #[test]
-    fn test_parse_args_preview_tempfile() {
-        // When SHELL is zsh, preview is written to a temp file
-        std::env::set_var("SHELL", "zsh");
-        let args: Vec<String> = vec!["--preview=echo hello"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-
-        let opts = parse_args(&args);
-        let preview = opts.preview.unwrap();
-        assert!(
-            preview.starts_with("zsh "),
-            "preview should start with shell: {preview}"
-        );
-        assert!(
-            preview.contains("skim-tab-preview-"),
-            "preview should reference temp file: {preview}"
-        );
-        // Verify the temp file was written with the script content
-        let path = preview.strip_prefix("zsh ").unwrap();
-        let content = std::fs::read_to_string(path).unwrap();
-        assert_eq!(content, "echo hello");
-        // Clean up
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]

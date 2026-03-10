@@ -5,6 +5,8 @@
 //!
 //! Theme: Nord (Arctic ice) with sleek Jedi-inspired iconography.
 
+pub mod complete;
+
 use skim::prelude::SkimOptionsBuilder;
 use skim::tui::options::TuiLayout;
 

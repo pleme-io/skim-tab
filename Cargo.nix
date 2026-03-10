@@ -161,7 +161,7 @@ rec {
           "perf-literal" = [ "dep:memchr" ];
           "std" = [ "memchr?/std" ];
         };
-        resolvedDefaultFeatures = [ "perf-literal" "std" ];
+        resolvedDefaultFeatures = [ "default" "perf-literal" "std" ];
       };
       "allocator-api2" = rec {
         crateName = "allocator-api2";
@@ -3547,6 +3547,36 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "hashbrown" ];
       };
+      "lscolors" = rec {
+        crateName = "lscolors";
+        version = "0.20.0";
+        edition = "2021";
+        crateBin = [];
+        sha256 = "1ax499r3kb1yhvmzs05x8f29slwnlxg5xm9hwdc9m84bvsjks631";
+        authors = [
+          "David Peter <mail@david-peter.de>"
+        ];
+        dependencies = [
+          {
+            name = "aho-corasick";
+            packageId = "aho-corasick";
+          }
+          {
+            name = "nu-ansi-term";
+            packageId = "nu-ansi-term";
+            optional = true;
+          }
+        ];
+        features = {
+          "ansi_term" = [ "dep:ansi_term" ];
+          "crossterm" = [ "dep:crossterm" ];
+          "default" = [ "nu-ansi-term" ];
+          "gnu_legacy" = [ "nu-ansi-term/gnu_legacy" ];
+          "nu-ansi-term" = [ "dep:nu-ansi-term" ];
+          "owo-colors" = [ "dep:owo-colors" ];
+        };
+        resolvedDefaultFeatures = [ "default" "nu-ansi-term" ];
+      };
       "mac_address" = rec {
         crateName = "mac_address";
         version = "1.1.8";
@@ -3933,6 +3963,34 @@ rec {
           "std" = [ "alloc" "memchr/std" ];
         };
         resolvedDefaultFeatures = [ "alloc" "default" "std" ];
+      };
+      "nu-ansi-term" = rec {
+        crateName = "nu-ansi-term";
+        version = "0.50.3";
+        edition = "2021";
+        sha256 = "1ra088d885lbd21q1bxgpqdlk1zlndblmarn948jz2a40xsbjmvr";
+        libName = "nu_ansi_term";
+        authors = [
+          "ogham@bsago.me"
+          "Ryan Scheel (Havvy) <ryan.havvy@gmail.com>"
+          "Josh Triplett <josh@joshtriplett.org>"
+          "The Nushell Project Developers"
+        ];
+        dependencies = [
+          {
+            name = "windows-sys";
+            packageId = "windows-sys 0.61.2";
+            rename = "windows";
+            target = { target, features }: (target."windows" or false);
+            features = [ "Win32_Foundation" "Win32_System_Console" "Win32_Storage_FileSystem" "Win32_Security" ];
+          }
+        ];
+        features = {
+          "default" = [ "std" ];
+          "derive_serde_style" = [ "serde" ];
+          "serde" = [ "dep:serde" ];
+        };
+        resolvedDefaultFeatures = [ "default" "std" ];
       };
       "num-conv" = rec {
         crateName = "num-conv";
@@ -6241,8 +6299,103 @@ rec {
         edition = "2021";
         crateBin = [
           {
+            name = "blx-backup";
+            path = "src/backup.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "blx-json";
+            path = "src/json.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "blx-ls";
+            path = "src/ls.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "blx-preview";
+            path = "src/preview.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "blx-preview-dir";
+            path = "src/preview_dir.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "blx-preview-git";
+            path = "src/preview_git.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "blx-preview-proc";
+            path = "src/preview_proc.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "blx-urldecode";
+            path = "src/urldecode.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "blx-urlencode";
+            path = "src/urlencode.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "blx-weather";
+            path = "src/weather.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "genpass";
+            path = "src/genpass.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "git-ac";
+            path = "src/gitac.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "git-acp";
+            path = "src/gitacp.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "git-clean-branches";
+            path = "src/gitclean.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "git-ct";
+            path = "src/gitct.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "killport";
+            path = "src/killport.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "localip";
+            path = "src/localip.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "skim-cd";
+            path = "src/cd.rs";
+            requiredFeatures = [ ];
+          }
+          {
             name = "skim-content";
             path = "src/content.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "skim-fco";
+            path = "src/fco.rs";
             requiredFeatures = [ ];
           }
           {
@@ -6251,8 +6404,23 @@ rec {
             requiredFeatures = [ ];
           }
           {
+            name = "skim-fkill";
+            path = "src/fkill.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "skim-fvim";
+            path = "src/fvim.rs";
+            requiredFeatures = [ ];
+          }
+          {
             name = "skim-history";
             path = "src/history.rs";
+            requiredFeatures = [ ];
+          }
+          {
+            name = "skim-kpod";
+            path = "src/kpod.rs";
             requiredFeatures = [ ];
           }
           {
@@ -6272,8 +6440,21 @@ rec {
             packageId = "anyhow";
           }
           {
+            name = "lscolors";
+            packageId = "lscolors";
+          }
+          {
             name = "regex";
             packageId = "regex";
+          }
+          {
+            name = "serde";
+            packageId = "serde";
+            features = [ "derive" ];
+          }
+          {
+            name = "serde_json";
+            packageId = "serde_json";
           }
           {
             name = "skim";
