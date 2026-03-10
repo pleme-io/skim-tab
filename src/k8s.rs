@@ -95,10 +95,9 @@ impl KubeContext {
 
     /// Format prompt string with truncated context name.
     pub fn prompt(&self) -> String {
-        let name = if self.context.len() > 15 {
-            &self.context[..15]
-        } else {
-            &self.context
+        let name = match self.context.char_indices().nth(15) {
+            Some((idx, _)) => &self.context[..idx],
+            None => &self.context,
         };
         format!("{}{name} ", crate::ICON_K8S)
     }

@@ -78,20 +78,26 @@ fn find_flag<'a>(words: &[&'a str], flags: &[&str]) -> Option<&'a str> {
 
 /// Generate a preview string for a completion candidate.
 pub fn preview(word: &str, command: &str, buffer: &str, realdir: &str) -> String {
+    let ctx = BufferContext::parse(buffer, command);
+
+    // K8s tools: resource type candidates (trailing `/`) handled uniformly,
+    // then tool-specific dispatch.
+    if let cmd @ ("kubectl" | "kubecolor" | "k" | "flux" | "helm") = ctx.base_cmd {
+        if word.ends_with('/') {
+            return preview_resource_type(cmd, word.trim_end_matches('/'), &ctx.ns_args());
+        }
+        return match cmd {
+            "flux" => preview_flux(&ctx, word),
+            "helm" => preview_helm(&ctx, word),
+            _ => preview_kubectl(&ctx, word),
+        };
+    }
+
     let path = if realdir.is_empty() {
         word.to_string()
     } else {
         format!("{realdir}{word}")
     };
-
-    let ctx = BufferContext::parse(buffer, command);
-
-    match ctx.base_cmd {
-        "kubectl" | "kubecolor" | "k" => return preview_kubectl(&ctx, word),
-        "flux" => return preview_flux(&ctx, word),
-        "helm" => return preview_helm(&ctx, word),
-        _ => {}
-    }
 
     match command {
         "cd" | "pushd" | "z" => preview_dir(&path),
@@ -106,33 +112,39 @@ pub fn preview(word: &str, command: &str, buffer: &str, realdir: &str) -> String
     }
 }
 
+// ── K8s resource listing ────────────────────────────────────────────
+
+/// List resources via `kubectl get`, formatted with count and sample.
+fn kubectl_resource_listing(resource_type: &str, ns: &[&str]) -> String {
+    let out = run("kubectl", &with_ns(&["get", resource_type, "--no-headers"], ns));
+    let count = out.lines().count();
+    let sample: String = out.lines().take(25).collect::<Vec<_>>().join("\n");
+    format!("  {} resources: {count}\n\n{sample}", resource_type.to_uppercase())
+}
+
+/// Preview a resource type candidate (trailing `/` already stripped).
+/// For flux, tries `flux get` first; falls back to kubectl.
+fn preview_resource_type(tool: &str, resource_type: &str, ns: &[&str]) -> String {
+    if tool == "flux" {
+        let out = run("flux", &with_ns(&["get", resource_type], ns));
+        if !out.is_empty() {
+            return format!("  {}\n\n{}", resource_type.to_uppercase(), out);
+        }
+    }
+    kubectl_resource_listing(resource_type, ns)
+}
+
 // ── kubectl ──────────────────────────────────────────────────────────
 
 fn preview_kubectl(ctx: &BufferContext, candidate: &str) -> String {
     let ns = ctx.ns_args();
     let (sub0, sub1) = (ctx.sub(0), ctx.sub(1));
 
-    // Candidates with trailing `/` are resource types (e.g. "pods/"), not names.
-    // Strip the slash and show a resource listing instead of a describe.
-    let clean = candidate.trim_end_matches('/');
-    let is_resource_type = candidate.ends_with('/');
-
     match sub0 {
-        _ if is_resource_type => {
-            let out = run("kubectl", &with_ns(&["get", clean, "--no-headers"], &ns));
-            let count = out.lines().count();
-            let sample: String = out.lines().take(25).collect::<Vec<_>>().join("\n");
-            format!("  {} resources: {count}\n\n{sample}", clean.to_uppercase())
-        }
         "get" | "describe" | "edit" | "delete" if !sub1.is_empty() => {
             truncated("kubectl", &with_ns(&["describe", sub1, candidate], &ns), 60)
         }
-        "get" | "describe" | "edit" | "delete" => {
-            let out = run("kubectl", &with_ns(&["get", candidate, "--no-headers"], &ns));
-            let count = out.lines().count();
-            let sample: String = out.lines().take(25).collect::<Vec<_>>().join("\n");
-            format!("  {} resources: {count}\n\n{sample}", candidate.to_uppercase())
-        }
+        "get" | "describe" | "edit" | "delete" => kubectl_resource_listing(candidate, &ns),
         "logs" => {
             run("kubectl", &with_ns(&["logs", "--tail=30", "--timestamps", candidate], &ns))
         }
@@ -157,28 +169,13 @@ fn preview_kubectl(ctx: &BufferContext, candidate: &str) -> String {
     }
 }
 
-// ── flux ──────────────────────────────────────────────────────────────
+// ── flux ─────────────────────────────────────────────────────────────
 
 fn preview_flux(ctx: &BufferContext, candidate: &str) -> String {
     let ns = ctx.ns_args();
     let (sub0, sub1) = (ctx.sub(0), ctx.sub(1));
 
-    let clean = candidate.trim_end_matches('/');
-    let is_resource_type = candidate.ends_with('/');
-
     match sub0 {
-        _ if is_resource_type => {
-            let out = run("flux", &with_ns(&["get", clean], &ns));
-            if out.is_empty() {
-                // Fallback to kubectl for non-flux CRDs
-                let out = run("kubectl", &with_ns(&["get", clean, "--no-headers"], &ns));
-                let count = out.lines().count();
-                let sample: String = out.lines().take(25).collect::<Vec<_>>().join("\n");
-                format!("  {} resources: {count}\n\n{sample}", clean.to_uppercase())
-            } else {
-                format!("  {}\n\n{}", clean.to_uppercase(), out)
-            }
-        }
         "get" if !sub1.is_empty() => {
             run("flux", &with_ns(&["get", sub1, candidate], &ns))
         }
@@ -200,22 +197,13 @@ fn preview_flux(ctx: &BufferContext, candidate: &str) -> String {
     }
 }
 
-// ── helm ──────────────────────────────────────────────────────────────
+// ── helm ─────────────────────────────────────────────────────────────
 
 fn preview_helm(ctx: &BufferContext, candidate: &str) -> String {
     let ns = ctx.ns_args();
     let (sub0, sub1) = (ctx.sub(0), ctx.sub(1));
 
-    let clean = candidate.trim_end_matches('/');
-    let is_resource_type = candidate.ends_with('/');
-
     match sub0 {
-        _ if is_resource_type => {
-            let out = run("kubectl", &with_ns(&["get", clean, "--no-headers"], &ns));
-            let count = out.lines().count();
-            let sample: String = out.lines().take(25).collect::<Vec<_>>().join("\n");
-            format!("  {} resources: {count}\n\n{sample}", clean.to_uppercase())
-        }
         "status" | "uninstall" | "rollback" | "history" => {
             run("helm", &with_ns(&[sub0, candidate], &ns))
         }
