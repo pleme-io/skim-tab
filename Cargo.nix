@@ -6314,26 +6314,6 @@ rec {
             requiredFeatures = [ ];
           }
           {
-            name = "blx-preview";
-            path = "src/preview.rs";
-            requiredFeatures = [ ];
-          }
-          {
-            name = "blx-preview-dir";
-            path = "src/preview_dir.rs";
-            requiredFeatures = [ ];
-          }
-          {
-            name = "blx-preview-git";
-            path = "src/preview_git.rs";
-            requiredFeatures = [ ];
-          }
-          {
-            name = "blx-preview-proc";
-            path = "src/preview_proc.rs";
-            requiredFeatures = [ ];
-          }
-          {
             name = "blx-urldecode";
             path = "src/urldecode.rs";
             requiredFeatures = [ ];

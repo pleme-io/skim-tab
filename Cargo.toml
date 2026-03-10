@@ -104,22 +104,6 @@ path = "src/gitct.rs"
 name = "blx-json"
 path = "src/json.rs"
 
-[[bin]]
-name = "blx-preview"
-path = "src/preview.rs"
-
-[[bin]]
-name = "blx-preview-dir"
-path = "src/preview_dir.rs"
-
-[[bin]]
-name = "blx-preview-proc"
-path = "src/preview_proc.rs"
-
-[[bin]]
-name = "blx-preview-git"
-path = "src/preview_git.rs"
-
 [dependencies]
 skim = "3.7"
 regex = "1"
