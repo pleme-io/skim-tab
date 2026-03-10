@@ -163,7 +163,22 @@ fn preview_flux(ctx: &BufferContext, candidate: &str) -> String {
     let ns = ctx.ns_args();
     let (sub0, sub1) = (ctx.sub(0), ctx.sub(1));
 
+    let clean = candidate.trim_end_matches('/');
+    let is_resource_type = candidate.ends_with('/');
+
     match sub0 {
+        _ if is_resource_type => {
+            let out = run("flux", &with_ns(&["get", clean], &ns));
+            if out.is_empty() {
+                // Fallback to kubectl for non-flux CRDs
+                let out = run("kubectl", &with_ns(&["get", clean, "--no-headers"], &ns));
+                let count = out.lines().count();
+                let sample: String = out.lines().take(25).collect::<Vec<_>>().join("\n");
+                format!("  {} resources: {count}\n\n{sample}", clean.to_uppercase())
+            } else {
+                format!("  {}\n\n{}", clean.to_uppercase(), out)
+            }
+        }
         "get" if !sub1.is_empty() => {
             run("flux", &with_ns(&["get", sub1, candidate], &ns))
         }
@@ -191,7 +206,16 @@ fn preview_helm(ctx: &BufferContext, candidate: &str) -> String {
     let ns = ctx.ns_args();
     let (sub0, sub1) = (ctx.sub(0), ctx.sub(1));
 
+    let clean = candidate.trim_end_matches('/');
+    let is_resource_type = candidate.ends_with('/');
+
     match sub0 {
+        _ if is_resource_type => {
+            let out = run("kubectl", &with_ns(&["get", clean, "--no-headers"], &ns));
+            let count = out.lines().count();
+            let sample: String = out.lines().take(25).collect::<Vec<_>>().join("\n");
+            format!("  {} resources: {count}\n\n{sample}", clean.to_uppercase())
+        }
         "status" | "uninstall" | "rollback" | "history" => {
             run("helm", &with_ns(&[sub0, candidate], &ns))
         }
