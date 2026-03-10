@@ -112,7 +112,18 @@ fn preview_kubectl(ctx: &BufferContext, candidate: &str) -> String {
     let ns = ctx.ns_args();
     let (sub0, sub1) = (ctx.sub(0), ctx.sub(1));
 
+    // Candidates with trailing `/` are resource types (e.g. "pods/"), not names.
+    // Strip the slash and show a resource listing instead of a describe.
+    let clean = candidate.trim_end_matches('/');
+    let is_resource_type = candidate.ends_with('/');
+
     match sub0 {
+        _ if is_resource_type => {
+            let out = run("kubectl", &with_ns(&["get", clean, "--no-headers"], &ns));
+            let count = out.lines().count();
+            let sample: String = out.lines().take(25).collect::<Vec<_>>().join("\n");
+            format!("  {} resources: {count}\n\n{sample}", clean.to_uppercase())
+        }
         "get" | "describe" | "edit" | "delete" if !sub1.is_empty() => {
             truncated("kubectl", &with_ns(&["describe", sub1, candidate], &ns), 60)
         }

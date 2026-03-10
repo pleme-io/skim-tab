@@ -185,11 +185,12 @@ fn colorize(display: &str, candidate: &Candidate, ls_colors: &LsColors, command:
             .unwrap_or_else(|| display.to_string());
     }
 
-    // Enrich candidates that have no description with built-in ones
+    // Enrich candidates that have no description with built-in ones.
+    // Strip trailing `/` for lookup (zsh adds it for resource type completions).
     let enriched;
     let text = if display.contains(" -- ") {
         display
-    } else if let Some(desc) = lookup_description(display, command) {
+    } else if let Some(desc) = lookup_description(display.trim_end_matches('/'), command) {
         enriched = format!("{display} -- {desc}");
         &enriched
     } else {
@@ -725,7 +726,14 @@ pub fn run_preview(args: &[String]) {
     };
 
     let plain = crate::strip_ansi(&args[1]);
-    let candidate = match manifest.candidates.iter().find(|c| c.display == plain) {
+    // Match against original display, or the word part before " -- "
+    // (enriched descriptions add " -- desc" that isn't in the manifest)
+    let match_text = plain.split(" -- ").next().unwrap_or(&plain);
+    let candidate = match manifest
+        .candidates
+        .iter()
+        .find(|c| c.display == plain || c.display == match_text)
+    {
         Some(c) => c,
         None => return,
     };
@@ -963,6 +971,17 @@ mod tests {
         let result = colorize("kustomizations", &c, &ls, "flux");
         let stripped = crate::strip_ansi(&result);
         assert!(stripped.contains("Kustomize reconciler"));
+    }
+
+    #[test]
+    fn colorize_enriches_trailing_slash_resource() {
+        let ls = LsColors::default();
+        let c = Candidate::default();
+        let result = colorize("jobs/", &c, &ls, "kubectl");
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("jobs/"));
+        assert!(stripped.contains(" -- "));
+        assert!(stripped.contains("Run-to-completion tasks"));
     }
 
     #[test]
