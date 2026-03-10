@@ -5,7 +5,10 @@
 //!   2. `--compcap` mode: reads NUL/STX compcap format on stdin,
 //!      with `--command`, `--query`, `--buffer` as CLI args (for the zsh widget)
 
-use crate::{base_options, ANSI_DIM, ANSI_FROST, ANSI_RESET, ANSI_YELLOW, ICON_CD, ICON_K8S, ICON_POINTER};
+use crate::{
+    base_options, k8s, ANSI_DIM, ANSI_FROST, ANSI_GREEN, ANSI_RESET, ANSI_YELLOW, ICON_CD,
+    ICON_K8S, ICON_POINTER,
+};
 use lscolors::LsColors;
 use serde::{Deserialize, Serialize};
 use skim::prelude::*;
@@ -162,6 +165,30 @@ fn parse_compcap(data: &[u8], command: &str, query: &str, buffer: &str) -> Compl
     }
 }
 
+// ── K8s enrichment ───────────────────────────────────────────────────
+
+/// Live cluster data collected once per completion invocation.
+#[derive(Default)]
+struct K8sEnrichment {
+    /// Resource type → count (Phase 2)
+    resource_counts: HashMap<String, usize>,
+    /// Namespace → pod count (Phase 3)
+    ns_pod_counts: HashMap<String, usize>,
+    /// Currently active namespace (Phase 3)
+    active_ns: String,
+}
+
+/// Check if candidates look like resource types (any has trailing `/`).
+fn has_resource_type_candidates(candidates: &[Candidate]) -> bool {
+    candidates.iter().any(|c| c.display_text().ends_with('/'))
+}
+
+/// Check if the buffer indicates namespace completion (`-n <TAB>` or `--namespace <TAB>`).
+fn is_namespace_completion(buffer: &str) -> bool {
+    let last = buffer.split_whitespace().last();
+    matches!(last, Some("-n" | "--namespace"))
+}
+
 // ── Colorize ─────────────────────────────────────────────────────────
 
 /// Apply Nord-themed ANSI coloring to a completion candidate.
@@ -172,7 +199,13 @@ fn parse_compcap(data: &[u8], command: &str, query: &str, buffer: &str) -> Compl
 /// - Everything else: frost accent
 ///
 /// The text structure is preserved so that `strip_ansi(colored) == display`.
-fn colorize(display: &str, candidate: &Candidate, ls_colors: &LsColors, command: &str) -> String {
+fn colorize(
+    display: &str,
+    candidate: &Candidate,
+    ls_colors: &LsColors,
+    command: &str,
+    k8s: &K8sEnrichment,
+) -> String {
     if candidate.is_file {
         let path = if candidate.realdir.is_empty() {
             display.to_string()
@@ -185,26 +218,77 @@ fn colorize(display: &str, candidate: &Candidate, ls_colors: &LsColors, command:
             .unwrap_or_else(|| display.to_string());
     }
 
-    // Enrich candidates that have no description with built-in ones.
     // Strip trailing `/` for lookup (zsh adds it for resource type completions).
+    let lookup_word = display.trim_end_matches('/');
+
+    // Build enriched description from static + live data.
     let enriched;
     let text = if display.contains(" -- ") {
         display
-    } else if let Some(desc) = lookup_description(display.trim_end_matches('/'), command) {
-        enriched = format!("{display} -- {desc}");
-        &enriched
     } else {
-        display
+        let desc = build_description(lookup_word, command, k8s);
+        if let Some(d) = desc {
+            enriched = format!("{display} -- {d}");
+            &enriched
+        } else {
+            display
+        }
     };
 
     // Parse "word -- description" and apply colors
     if let Some((word, desc)) = text.split_once(" -- ") {
+        // Phase 3: namespace active marker — green highlight
+        if !k8s.active_ns.is_empty() && lookup_word == k8s.active_ns {
+            return format!("{ANSI_GREEN}{word}{ANSI_RESET} {ANSI_DIM}-- {desc}{ANSI_RESET}");
+        }
         let wc = if word.starts_with('-') { ANSI_YELLOW } else { ANSI_FROST };
         format!("{wc}{word}{ANSI_RESET} {ANSI_DIM}-- {desc}{ANSI_RESET}")
     } else if text.starts_with('-') {
         format!("{ANSI_YELLOW}{text}{ANSI_RESET}")
     } else {
         format!("{ANSI_FROST}{text}{ANSI_RESET}")
+    }
+}
+
+/// Compose a description from static registry + live cluster data.
+fn build_description(word: &str, command: &str, k8s: &K8sEnrichment) -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+
+    // Static description from TOOL_REGISTRY
+    if let Some(desc) = lookup_description(word, command) {
+        parts.push(desc.to_string());
+    }
+
+    // Phase 2: live resource count
+    if let Some(&count) = k8s.resource_counts.get(word) {
+        parts.push(format!("{count}"));
+    }
+
+    // Phase 3: namespace enrichment
+    if !k8s.active_ns.is_empty() {
+        let mut ns_parts: Vec<&str> = Vec::new();
+        if word == k8s.active_ns {
+            ns_parts.push("active");
+        }
+        if let Some(&count) = k8s.ns_pod_counts.get(word) {
+            // Use a leaked string for the count — this runs once per completion
+            let s = format!("{count} pods");
+            parts.push(
+                if ns_parts.is_empty() {
+                    s
+                } else {
+                    format!("{}, {s}", ns_parts.join(", "))
+                },
+            );
+        } else if !ns_parts.is_empty() {
+            parts.push(ns_parts.join(", ").to_string());
+        }
+    }
+
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(" · "))
     }
 }
 
@@ -548,26 +632,70 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
     }
 
     let ls_colors = LsColors::from_env().unwrap_or_default();
-    let cmd_for_color = completion_base_cmd(&req.command, &req.buffer);
+    let base_cmd = completion_base_cmd(&req.command, &req.buffer);
+    let is_k8s = tool_icon(&base_cmd).is_some();
+
+    // Phase 1: K8s context for header/prompt (pure file read, ~0ms)
+    let kube_ctx = if is_k8s { k8s::KubeContext::current() } else { None };
+
+    // Phase 2: Resource counts for resource type candidates
+    let resource_counts = if is_k8s && has_resource_type_candidates(&req.candidates) {
+        let types: Vec<&str> = req
+            .candidates
+            .iter()
+            .map(|c| c.display_text().trim_end_matches('/'))
+            .filter(|d| lookup_description(d, &base_cmd).is_some())
+            .collect();
+        let ns = kube_ctx.as_ref().map(|c| c.namespace.as_str());
+        k8s::resource_counts(&types, ns)
+    } else {
+        HashMap::new()
+    };
+
+    // Phase 3: Namespace enrichment
+    let (ns_pod_counts, active_ns) = if is_k8s && is_namespace_completion(&req.buffer) {
+        let active = kube_ctx
+            .as_ref()
+            .map_or("default", |c| c.namespace.as_str())
+            .to_string();
+        (k8s::namespace_pod_counts(), active)
+    } else {
+        (HashMap::new(), String::new())
+    };
+
+    let enrichment = K8sEnrichment {
+        resource_counts,
+        ns_pod_counts,
+        active_ns,
+    };
+
     let display_lines: Vec<String> = req
         .candidates
         .iter()
-        .map(|c| colorize(c.display_text(), c, &ls_colors, &cmd_for_color))
+        .map(|c| colorize(c.display_text(), c, &ls_colors, &base_cmd, &enrichment))
         .collect();
 
-    let base_cmd = completion_base_cmd(&req.command, &req.buffer);
+    // Prompt: context-aware for k8s, icon for others
     let prompt = match req.command.as_str() {
-        "cd" | "pushd" | "z" => ICON_CD,
-        _ => tool_icon(&base_cmd).unwrap_or(ICON_POINTER),
+        "cd" | "pushd" | "z" => ICON_CD.to_string(),
+        _ => kube_ctx
+            .as_ref()
+            .map(|ctx| ctx.prompt())
+            .unwrap_or_else(|| tool_icon(&base_cmd).unwrap_or(ICON_POINTER).to_string()),
     };
 
     let mut builder = base_options(&req.query);
     builder
         .multi(false)
-        .prompt(prompt.to_string())
+        .prompt(prompt)
         .height("40%".to_string())
         .cycle(true)
         .no_sort(true);
+
+    // Phase 1: context header
+    if let Some(ref ctx) = kube_ctx {
+        builder.header(ctx.header());
+    }
 
     // Write preview manifest for the --preview callback
     let manifest_path = std::env::temp_dir().join(format!(
@@ -909,7 +1037,7 @@ mod tests {
             ..Default::default()
         };
         // Should not panic and should return something non-empty
-        let result = colorize("src", &c, &ls, "ls");
+        let result = colorize("src", &c, &ls, "ls", &K8sEnrichment::default());
         assert!(!result.is_empty());
     }
 
@@ -917,7 +1045,7 @@ mod tests {
     fn colorize_non_file_with_description() {
         let ls = LsColors::default();
         let c = Candidate::default();
-        let result = colorize("get -- Display resources", &c, &ls, "kubectl");
+        let result = colorize("get -- Display resources", &c, &ls, "kubectl", &K8sEnrichment::default());
         // Should contain ANSI codes
         assert!(result.contains('\x1b'));
         // Stripped should match original
@@ -928,7 +1056,7 @@ mod tests {
     fn colorize_flag() {
         let ls = LsColors::default();
         let c = Candidate::default();
-        let result = colorize("--namespace", &c, &ls, "kubectl");
+        let result = colorize("--namespace", &c, &ls, "kubectl", &K8sEnrichment::default());
         assert!(result.contains('\x1b'));
         assert_eq!(crate::strip_ansi(&result), "--namespace");
     }
@@ -937,7 +1065,7 @@ mod tests {
     fn colorize_flag_with_description() {
         let ls = LsColors::default();
         let c = Candidate::default();
-        let result = colorize("--output -- Output format", &c, &ls, "kubectl");
+        let result = colorize("--output -- Output format", &c, &ls, "kubectl", &K8sEnrichment::default());
         assert!(result.contains(ANSI_YELLOW));
         assert_eq!(crate::strip_ansi(&result), "--output -- Output format");
     }
@@ -946,7 +1074,7 @@ mod tests {
     fn colorize_enriches_kubectl_subcommand() {
         let ls = LsColors::default();
         let c = Candidate { word: "get".into(), display: "get".into(), ..Default::default() };
-        let result = colorize("get", &c, &ls, "kubectl");
+        let result = colorize("get", &c, &ls, "kubectl", &K8sEnrichment::default());
         let stripped = crate::strip_ansi(&result);
         assert!(stripped.contains("get"));
         assert!(stripped.contains(" -- "));
@@ -957,7 +1085,7 @@ mod tests {
     fn colorize_enriches_helm_subcommand() {
         let ls = LsColors::default();
         let c = Candidate::default();
-        let result = colorize("install", &c, &ls, "helm");
+        let result = colorize("install", &c, &ls, "helm", &K8sEnrichment::default());
         let stripped = crate::strip_ansi(&result);
         assert!(stripped.contains("install"));
         assert!(stripped.contains(" -- "));
@@ -968,7 +1096,7 @@ mod tests {
     fn colorize_enriches_flux_resource_type() {
         let ls = LsColors::default();
         let c = Candidate::default();
-        let result = colorize("kustomizations", &c, &ls, "flux");
+        let result = colorize("kustomizations", &c, &ls, "flux", &K8sEnrichment::default());
         let stripped = crate::strip_ansi(&result);
         assert!(stripped.contains("Kustomize reconciler"));
     }
@@ -977,7 +1105,7 @@ mod tests {
     fn colorize_enriches_trailing_slash_resource() {
         let ls = LsColors::default();
         let c = Candidate::default();
-        let result = colorize("jobs/", &c, &ls, "kubectl");
+        let result = colorize("jobs/", &c, &ls, "kubectl", &K8sEnrichment::default());
         let stripped = crate::strip_ansi(&result);
         assert!(stripped.contains("jobs/"));
         assert!(stripped.contains(" -- "));
@@ -988,7 +1116,7 @@ mod tests {
     fn colorize_no_enrichment_for_unknown() {
         let ls = LsColors::default();
         let c = Candidate::default();
-        let result = colorize("my-random-pod", &c, &ls, "kubectl");
+        let result = colorize("my-random-pod", &c, &ls, "kubectl", &K8sEnrichment::default());
         let stripped = crate::strip_ansi(&result);
         assert_eq!(stripped, "my-random-pod");
     }
@@ -1028,5 +1156,107 @@ mod tests {
         assert_eq!(completion_base_cmd("", "kubectl get pods"), "kubectl");
         assert_eq!(completion_base_cmd("helm", ""), "helm");
         assert_eq!(completion_base_cmd("cd", "cd /tmp"), "cd");
+    }
+
+    #[test]
+    fn has_resource_type_candidates_detects() {
+        let with_slash = vec![
+            Candidate { display: "pods/".into(), ..Default::default() },
+            Candidate { display: "services/".into(), ..Default::default() },
+        ];
+        assert!(has_resource_type_candidates(&with_slash));
+
+        let without = vec![
+            Candidate { display: "get".into(), ..Default::default() },
+            Candidate { display: "describe".into(), ..Default::default() },
+        ];
+        assert!(!has_resource_type_candidates(&without));
+    }
+
+    #[test]
+    fn is_namespace_completion_detects() {
+        assert!(is_namespace_completion("kubectl -n"));
+        assert!(is_namespace_completion("kubectl get pods --namespace"));
+        assert!(!is_namespace_completion("kubectl get pods"));
+        assert!(!is_namespace_completion("kubectl -n default get"));
+    }
+
+    #[test]
+    fn colorize_with_resource_count() {
+        let ls = LsColors::default();
+        let c = Candidate::default();
+        let k8s = K8sEnrichment {
+            resource_counts: HashMap::from([("pods".to_string(), 42)]),
+            ..Default::default()
+        };
+        let result = colorize("pods/", &c, &ls, "kubectl", &k8s);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("Pod workloads"));
+        assert!(stripped.contains("42"));
+    }
+
+    #[test]
+    fn colorize_with_namespace_enrichment() {
+        let ls = LsColors::default();
+        let c = Candidate::default();
+        let k8s = K8sEnrichment {
+            ns_pod_counts: HashMap::from([
+                ("default".to_string(), 12),
+                ("kube-system".to_string(), 8),
+            ]),
+            active_ns: "default".to_string(),
+            ..Default::default()
+        };
+        // Active namespace
+        let result = colorize("default", &c, &ls, "kubectl", &k8s);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("active"));
+        assert!(stripped.contains("12 pods"));
+        // Active namespace gets green color
+        assert!(result.contains(ANSI_GREEN));
+
+        // Non-active namespace
+        let result2 = colorize("kube-system", &c, &ls, "kubectl", &k8s);
+        let stripped2 = crate::strip_ansi(&result2);
+        assert!(!stripped2.contains("active"));
+        assert!(stripped2.contains("8 pods"));
+    }
+
+    #[test]
+    fn build_description_combines_parts() {
+        let k8s = K8sEnrichment {
+            resource_counts: HashMap::from([("pods".to_string(), 72)]),
+            ..Default::default()
+        };
+        let desc = build_description("pods", "kubectl", &k8s);
+        assert_eq!(desc, Some("Pod workloads · 72".to_string()));
+    }
+
+    #[test]
+    fn build_description_static_only() {
+        let k8s = K8sEnrichment::default();
+        let desc = build_description("pods", "kubectl", &k8s);
+        assert_eq!(desc, Some("Pod workloads".to_string()));
+    }
+
+    #[test]
+    fn build_description_count_only() {
+        let k8s = K8sEnrichment {
+            resource_counts: HashMap::from([("unknown-type".to_string(), 5)]),
+            ..Default::default()
+        };
+        let desc = build_description("unknown-type", "kubectl", &k8s);
+        assert_eq!(desc, Some("5".to_string()));
+    }
+
+    #[test]
+    fn build_description_namespace() {
+        let k8s = K8sEnrichment {
+            ns_pod_counts: HashMap::from([("default".to_string(), 12)]),
+            active_ns: "default".to_string(),
+            ..Default::default()
+        };
+        let desc = build_description("default", "kubectl", &k8s);
+        assert_eq!(desc, Some("active, 12 pods".to_string()));
     }
 }
