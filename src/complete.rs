@@ -27,6 +27,9 @@ pub struct CompletionRequest {
     pub query: String,
     #[serde(default)]
     pub command: String,
+    /// Full command line buffer (LBUFFER from zsh) for context-aware preview
+    #[serde(default)]
+    pub buffer: String,
     #[serde(default)]
     pub groups: Vec<String>,
     #[serde(default)]
@@ -89,7 +92,7 @@ pub struct Selection {
 ///
 /// The NUL-separated key-value pairs after the `<\x00>` marker contain:
 ///   PREFIX, SUFFIX, IPREFIX, ISUFFIX, apre, hpre, group, realdir, args, word
-fn parse_compcap(data: &[u8], command: &str, query: &str) -> CompletionRequest {
+fn parse_compcap(data: &[u8], command: &str, query: &str, buffer: &str) -> CompletionRequest {
     let mut candidates = Vec::new();
 
     for entry in data.split(|&b| b == 0x03) {
@@ -157,6 +160,7 @@ fn parse_compcap(data: &[u8], command: &str, query: &str) -> CompletionRequest {
         candidates,
         query: query.to_string(),
         command: command.to_string(),
+        buffer: buffer.to_string(),
         groups: vec![],
         continuous_trigger: "/".to_string(),
     }
@@ -164,7 +168,47 @@ fn parse_compcap(data: &[u8], command: &str, query: &str) -> CompletionRequest {
 
 // ── Preview ─────────────────────────────────────────────────────────────
 
-fn preview_candidate(candidate: &Candidate, command: &str) -> String {
+// ── Buffer context parsing ─────────────────────────────────────────────
+
+/// Extract subcommand words from a command line, skipping flags and their values.
+fn extract_subcmds(words: &[&str]) -> Vec<String> {
+    let flag_with_value = [
+        "-n", "--namespace", "-o", "--output", "-l", "--selector",
+        "-f", "--filename", "--context", "--kubeconfig", "-c", "--container",
+        "--type", "--sort-by", "--field-selector", "--server", "--token",
+        "--certificate-authority", "--cluster", "--user",
+    ];
+    let mut result = Vec::new();
+    let mut skip_next = false;
+    for &w in words.iter().skip(1) {
+        if skip_next { skip_next = false; continue; }
+        if w.starts_with('-') {
+            if flag_with_value.contains(&w) || w.contains('=') {
+                if !w.contains('=') { skip_next = true; }
+            }
+            continue;
+        }
+        result.push(w.to_string());
+    }
+    result
+}
+
+/// Extract a flag's value from words (e.g., -n myns → Some("myns"))
+fn extract_flag<'a>(words: &[&'a str], flags: &[&str]) -> Option<&'a str> {
+    for (i, &w) in words.iter().enumerate() {
+        if flags.contains(&w) {
+            return words.get(i + 1).copied();
+        }
+        for flag in flags {
+            if let Some(val) = w.strip_prefix(&format!("{flag}=")) {
+                return Some(val);
+            }
+        }
+    }
+    None
+}
+
+fn preview_candidate(candidate: &Candidate, command: &str, buffer: &str) -> String {
     let word = &candidate.word;
     let path = if candidate.realdir.is_empty() {
         word.to_string()
@@ -172,6 +216,19 @@ fn preview_candidate(candidate: &Candidate, command: &str) -> String {
         format!("{}{}", candidate.realdir, word)
     };
 
+    // Parse the command line buffer for context-aware preview
+    let buf_words: Vec<&str> = buffer.split_whitespace().collect();
+    let base_cmd = buf_words.first().copied().unwrap_or(command);
+
+    // Route to specialized preview based on the base command
+    match base_cmd {
+        "kubectl" | "kubecolor" | "k" => return preview_kubectl(&buf_words, word),
+        "flux" => return preview_flux(&buf_words, word),
+        "helm" => return preview_helm(&buf_words, word),
+        _ => {}
+    }
+
+    // Fall back to the original command-based dispatch
     match command {
         // Directory navigation → tree view
         "cd" | "pushd" | "z" => preview_dir(&path),
@@ -189,14 +246,6 @@ fn preview_candidate(candidate: &Candidate, command: &str) -> String {
         cmd if cmd.starts_with("git-log") => preview_git("log", word),
         cmd if cmd.starts_with("git-checkout") => preview_git("checkout", word),
 
-        // Package managers → package info
-        "brew" | "nix" | "cargo" | "npm" | "pip" => preview_command(word),
-
-        // SSH/systemctl/docker → contextual help
-        "ssh" => preview_command("ssh"),
-        "systemctl" => preview_command(word),
-        "docker" | "kubectl" | "helm" | "flux" => preview_command(word),
-
         // Empty command → completing a command name (first word on line)
         "" => {
             if Path::new(&path).is_dir() {
@@ -204,38 +253,237 @@ fn preview_candidate(candidate: &Candidate, command: &str) -> String {
             } else if Path::new(&path).is_file() {
                 preview_file(&path)
             } else {
-                // Completing a command → show tldr/man
                 preview_command(word)
             }
         }
 
-        // Default: try file/dir, fall back to command help for the word
+        // Default: try file/dir, fall back to command help
         _ => {
             if Path::new(&path).is_dir() {
                 preview_dir(&path)
             } else if Path::new(&path).is_file() {
                 preview_file(&path)
+            } else if word.starts_with('-') {
+                preview_command(command)
             } else {
-                // For flags/options, show help for the parent command
-                if word.starts_with('-') {
-                    preview_command_help(command, word)
-                } else {
-                    // Could be a subcommand or argument — try tldr for the word
-                    let result = preview_command(word);
-                    if result.is_empty() {
-                        preview_command(command)
-                    } else {
-                        result
-                    }
-                }
+                let result = preview_command(word);
+                if result.is_empty() { preview_command(command) } else { result }
             }
         }
     }
 }
 
-/// Preview a command using tldr (tealdeer) with fallback to man --help
+// ── kubectl preview ───────────────────────────────────────────────────
+
+fn preview_kubectl(words: &[&str], candidate: &str) -> String {
+    let subcmds = extract_subcmds(words);
+    let ns = extract_flag(words, &["-n", "--namespace"]);
+    let mut ns_args: Vec<&str> = Vec::new();
+    if let Some(n) = ns { ns_args.extend(["-n", n]); }
+
+    let sub0 = subcmds.first().map(String::as_str).unwrap_or("");
+    let sub1 = subcmds.get(1).map(String::as_str).unwrap_or("");
+
+    match sub0 {
+        // Completing resource names → describe
+        "get" | "describe" | "edit" | "delete" if !sub1.is_empty() => {
+            let mut args = vec!["describe", sub1, candidate, "--output=yaml"];
+            args.extend(ns_args.iter());
+            run_cmd_truncated("kubectl", &args, 60)
+        }
+        // Completing resource types → show api-resources info + count
+        "get" | "describe" | "edit" | "delete" => {
+            let mut args = vec!["get", candidate, "--no-headers"];
+            args.extend(ns_args.iter());
+            let count_out = run_cmd("kubectl", &args);
+            let count = count_out.lines().count();
+            let sample: String = count_out.lines().take(25).collect::<Vec<_>>().join("\n");
+            format!("  {} resources: {count}\n\n{sample}", candidate.to_uppercase())
+        }
+        // Completing pods for logs → show recent log lines
+        "logs" => {
+            let mut args = vec!["logs", "--tail=30", "--timestamps", candidate];
+            args.extend(ns_args.iter());
+            run_cmd("kubectl", &args)
+        }
+        // Completing pods for exec/attach/port-forward → pod details
+        "exec" | "attach" | "port-forward" | "cp" => {
+            let mut args = vec!["get", "pod", candidate, "-o", "wide"];
+            args.extend(ns_args.iter());
+            let wide = run_cmd("kubectl", &args);
+            let mut args2 = vec!["describe", "pod", candidate];
+            args2.extend(ns_args.iter());
+            let desc = run_cmd_truncated("kubectl", &args2, 40);
+            format!("{wide}\n{desc}")
+        }
+        // Completing pods for top → resource usage
+        "top" if sub1 == "pod" || sub1.is_empty() => {
+            let mut args = vec!["top", "pod", candidate];
+            args.extend(ns_args.iter());
+            run_cmd("kubectl", &args)
+        }
+        // Completing namespaces (-n flag) → show namespace contents
+        "" if candidate.starts_with('-') => {
+            preview_command("kubectl")
+        }
+        // Completing subcommands → tldr
+        "" => {
+            let tldr = preview_command(&format!("kubectl-{candidate}"));
+            if tldr.is_empty() { preview_command("kubectl") } else { tldr }
+        }
+        // Rollout subcommands
+        "rollout" if !sub1.is_empty() => {
+            let resource = subcmds.get(2).map(String::as_str).unwrap_or("");
+            if resource.is_empty() {
+                let mut args = vec!["rollout", "status", sub1, candidate];
+                args.extend(ns_args.iter());
+                run_cmd("kubectl", &args)
+            } else {
+                let mut args = vec!["rollout", "status", sub1, candidate];
+                args.extend(ns_args.iter());
+                run_cmd("kubectl", &args)
+            }
+        }
+        // Scale → show current replicas
+        "scale" if !sub1.is_empty() => {
+            let mut args = vec!["get", sub1, candidate, "-o", "wide"];
+            args.extend(ns_args.iter());
+            run_cmd("kubectl", &args)
+        }
+        // Apply/create with -f → file preview
+        "apply" | "create" => {
+            if Path::new(candidate).is_file() {
+                preview_file(candidate)
+            } else if Path::new(candidate).is_dir() {
+                preview_dir(candidate)
+            } else {
+                preview_command("kubectl")
+            }
+        }
+        // Default
+        _ => preview_command("kubectl"),
+    }
+}
+
+// ── flux preview ──────────────────────────────────────────────────────
+
+fn preview_flux(words: &[&str], candidate: &str) -> String {
+    let subcmds = extract_subcmds(words);
+    let ns = extract_flag(words, &["-n", "--namespace"]);
+    let mut ns_args: Vec<&str> = Vec::new();
+    if let Some(n) = ns { ns_args.extend(["-n", n]); }
+
+    let sub0 = subcmds.first().map(String::as_str).unwrap_or("");
+    let sub1 = subcmds.get(1).map(String::as_str).unwrap_or("");
+
+    match sub0 {
+        // flux get <type> <name> → show status
+        "get" if !sub1.is_empty() => {
+            let mut args = vec!["get", sub1, candidate];
+            args.extend(ns_args.iter());
+            run_cmd("flux", &args)
+        }
+        // flux get <type> → show all of that type
+        "get" => {
+            let mut args = vec!["get", candidate];
+            args.extend(ns_args.iter());
+            run_cmd("flux", &args)
+        }
+        // flux reconcile <type> <name> → show current status before reconciling
+        "reconcile" if !sub1.is_empty() => {
+            let mut args = vec!["get", sub1, candidate];
+            args.extend(ns_args.iter());
+            let status = run_cmd("flux", &args);
+            format!("Current status (before reconcile):\n\n{status}")
+        }
+        // flux reconcile <type> → show all of that type
+        "reconcile" => {
+            let mut args = vec!["get", candidate];
+            args.extend(ns_args.iter());
+            run_cmd("flux", &args)
+        }
+        // flux suspend/resume <type> <name> → show current status
+        "suspend" | "resume" if !sub1.is_empty() => {
+            let mut args = vec!["get", sub1, candidate];
+            args.extend(ns_args.iter());
+            run_cmd("flux", &args)
+        }
+        // flux logs → show flux controller logs
+        "logs" => {
+            run_cmd("flux", &["logs", "--tail=30"])
+        }
+        // flux events → show flux events
+        "events" => {
+            run_cmd("flux", &["events", "--for", candidate])
+        }
+        // Completing subcommands → help
+        "" => preview_command("flux"),
+        _ => preview_command("flux"),
+    }
+}
+
+// ── helm preview ──────────────────────────────────────────────────────
+
+fn preview_helm(words: &[&str], candidate: &str) -> String {
+    let subcmds = extract_subcmds(words);
+    let ns = extract_flag(words, &["-n", "--namespace"]);
+    let mut ns_args: Vec<&str> = Vec::new();
+    if let Some(n) = ns { ns_args.extend(["-n", n]); }
+
+    let sub0 = subcmds.first().map(String::as_str).unwrap_or("");
+
+    match sub0 {
+        // helm status <release> → show release status
+        "status" | "uninstall" | "rollback" | "history" => {
+            let mut args = vec![sub0, candidate];
+            args.extend(ns_args.iter());
+            run_cmd("helm", &args)
+        }
+        // helm upgrade <release> → show current release status
+        "upgrade" => {
+            let mut args = vec!["status", candidate];
+            args.extend(ns_args.iter());
+            run_cmd("helm", &args)
+        }
+        // helm install <chart> or helm show → chart info
+        "install" | "template" => {
+            let sub1 = subcmds.get(1).map(String::as_str).unwrap_or("");
+            if sub1.is_empty() {
+                // Completing release name
+                preview_command("helm")
+            } else {
+                // Completing chart name → show chart
+                run_cmd_truncated("helm", &["show", "chart", candidate], 50)
+            }
+        }
+        "show" => {
+            let sub1 = subcmds.get(1).map(String::as_str).unwrap_or("");
+            if sub1.is_empty() {
+                preview_command("helm")
+            } else {
+                run_cmd_truncated("helm", &["show", sub1, candidate], 60)
+            }
+        }
+        // helm list → show release info (completing release names)
+        "list" => {
+            let mut args = vec!["status", candidate];
+            args.extend(ns_args.iter());
+            run_cmd("helm", &args)
+        }
+        // helm repo → repo operations
+        "repo" => {
+            run_cmd("helm", &["repo", "list"])
+        }
+        // Completing subcommands → help
+        "" => preview_command("helm"),
+        _ => preview_command("helm"),
+    }
+}
+
+// ── Generic command preview ───────────────────────────────────────────
+
+/// Preview a command using tldr (tealdeer) with fallback to --help
 fn preview_command(cmd: &str) -> String {
-    // Try tldr first (fast, colorized, concise)
     let tldr = Command::new("tldr")
         .args(["--color=always", cmd])
         .output();
@@ -245,10 +493,7 @@ fn preview_command(cmd: &str) -> String {
         }
     }
 
-    // Fall back to --help (many commands support this)
-    let help = Command::new(cmd)
-        .arg("--help")
-        .output();
+    let help = Command::new(cmd).arg("--help").output();
     if let Ok(out) = &help {
         let text = if out.stdout.is_empty() {
             String::from_utf8_lossy(&out.stderr).into_owned()
@@ -256,74 +501,54 @@ fn preview_command(cmd: &str) -> String {
             String::from_utf8_lossy(&out.stdout).into_owned()
         };
         if !text.is_empty() {
-            // Truncate to ~80 lines for preview readability
-            let truncated: String = text.lines().take(80).collect::<Vec<_>>().join("\n");
-            return truncated;
+            return text.lines().take(80).collect::<Vec<_>>().join("\n");
         }
     }
 
     String::new()
 }
 
-/// Preview help for a specific flag/option of a command
-fn preview_command_help(cmd: &str, _flag: &str) -> String {
-    // Show the command's help — the user can see what flags are available
-    preview_command(cmd)
+// ── Shell command helpers ──────────────────────────────────────────────
+
+fn run_cmd(cmd: &str, args: &[&str]) -> String {
+    Command::new(cmd)
+        .args(args)
+        .output()
+        .map(|o| {
+            let out = String::from_utf8_lossy(&o.stdout);
+            if out.is_empty() {
+                String::from_utf8_lossy(&o.stderr).into_owned()
+            } else {
+                out.into_owned()
+            }
+        })
+        .unwrap_or_default()
 }
 
+fn run_cmd_truncated(cmd: &str, args: &[&str], max_lines: usize) -> String {
+    let output = run_cmd(cmd, args);
+    output.lines().take(max_lines).collect::<Vec<_>>().join("\n")
+}
+
+// ── File/dir preview ──────────────────────────────────────────────────
+
 fn preview_dir(path: &str) -> String {
-    Command::new("eza")
-        .args(["--tree", "--level=2", "--icons", "--color=always", path])
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default()
+    run_cmd("eza", &["--tree", "--level=2", "--icons", "--color=always", path])
 }
 
 fn preview_file(path: &str) -> String {
-    Command::new("bat")
-        .args([
-            "--color=always",
-            "--style=numbers",
-            "--line-range=:200",
-            path,
-        ])
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default()
+    run_cmd("bat", &["--color=always", "--style=numbers", "--line-range=:200", path])
 }
 
 fn preview_proc(word: &str) -> String {
-    Command::new("ps")
-        .args(["-p", word, "-o", "pid,ppid,%cpu,%mem,start,command"])
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default()
+    run_cmd("ps", &["-p", word, "-o", "pid,ppid,%cpu,%mem,start,command"])
 }
 
 fn preview_git(subcmd: &str, word: &str) -> String {
     match subcmd {
-        "diff" => Command::new("git")
-            .args(["diff", "--color=always", "--", word])
-            .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-            .unwrap_or_default(),
-        "log" => Command::new("git")
-            .args([
-                "log",
-                "--oneline",
-                "--graph",
-                "--color=always",
-                "-20",
-                word,
-            ])
-            .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-            .unwrap_or_default(),
-        "checkout" => Command::new("git")
-            .args(["log", "--oneline", "--graph", "--color=always", "-10", word])
-            .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-            .unwrap_or_default(),
+        "diff" => run_cmd("git", &["diff", "--color=always", "--", word]),
+        "log" => run_cmd("git", &["log", "--oneline", "--graph", "--color=always", "-20", word]),
+        "checkout" => run_cmd("git", &["log", "--oneline", "--graph", "--color=always", "-10", word]),
         _ => String::new(),
     }
 }
@@ -418,6 +643,7 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
     ));
     let manifest = serde_json::json!({
         "command": &req.command,
+        "buffer": &req.buffer,
         "candidates": req.candidates.iter().map(|c| {
             serde_json::json!({
                 "word": c.word,
@@ -566,6 +792,7 @@ pub fn run() {
 pub fn run_compcap(args: &[String]) {
     let mut command = String::new();
     let mut query = String::new();
+    let mut buffer = String::new();
 
     let mut i = 0;
     while i < args.len() {
@@ -582,6 +809,12 @@ pub fn run_compcap(args: &[String]) {
                     query = args[i].clone();
                 }
             }
+            "--buffer" => {
+                i += 1;
+                if i < args.len() {
+                    buffer = args[i].clone();
+                }
+            }
             _ => {}
         }
         i += 1;
@@ -591,7 +824,7 @@ pub fn run_compcap(args: &[String]) {
     let mut data = Vec::new();
     io::stdin().lock().read_to_end(&mut data).unwrap_or(0);
 
-    let req = parse_compcap(&data, &command, &query);
+    let req = parse_compcap(&data, &command, &query, &buffer);
     run_completion(req, OutputMode::Eval);
 }
 
@@ -611,6 +844,8 @@ pub fn run_preview(args: &[String]) {
     #[derive(Deserialize)]
     struct PreviewManifest {
         command: String,
+        #[serde(default)]
+        buffer: String,
         candidates: Vec<PreviewCandidate>,
     }
     #[derive(Deserialize)]
@@ -651,7 +886,7 @@ pub fn run_preview(args: &[String]) {
         args: String::new(),
     };
 
-    let output = preview_candidate(&c, &manifest.command);
+    let output = preview_candidate(&c, &manifest.command, &manifest.buffer);
     print!("{output}");
 }
 
@@ -709,7 +944,7 @@ mod tests {
     fn parse_compcap_basic() {
         // Simulate compcap format: display\x02<\x00>\x00PREFIX\x00.c\x00word\x00.claude
         let entry = b".claude\x02<\x00>\x00PREFIX\x00.c\x00word\x00.claude";
-        let req = parse_compcap(entry, "cd", ".c");
+        let req = parse_compcap(entry, "cd", ".c", "cd ");
         assert_eq!(req.candidates.len(), 1);
         assert_eq!(req.candidates[0].word, ".claude");
         assert_eq!(req.candidates[0].display, ".claude");
@@ -723,7 +958,7 @@ mod tests {
         // Entry with realdir → is_file should be true
         let entry =
             b".git\x02<\x00>\x00realdir\x00/Users/drzzln/\x00word\x00.git";
-        let req = parse_compcap(entry, "cd", "");
+        let req = parse_compcap(entry, "cd", "", "cd ");
         assert_eq!(req.candidates.len(), 1);
         assert!(req.candidates[0].is_file);
         assert_eq!(req.candidates[0].realdir, "/Users/drzzln/");
@@ -738,7 +973,7 @@ mod tests {
         data.extend_from_slice(b".git\x02<\x00>\x00word\x00.git");
         data.push(0x03);
 
-        let req = parse_compcap(&data, "cd", ".c");
+        let req = parse_compcap(&data, "cd", ".c", "cd .");
         assert_eq!(req.candidates.len(), 2);
         assert_eq!(req.candidates[0].word, ".claude");
         assert_eq!(req.candidates[1].word, ".git");
@@ -749,14 +984,14 @@ mod tests {
         // Entry with args containing SOH-separated flags
         let entry =
             b"item\x02<\x00>\x00args\x00-P\x01/usr/\x01-f\x00word\x00item";
-        let req = parse_compcap(entry, "ls", "");
+        let req = parse_compcap(entry, "ls", "", "ls ");
         assert_eq!(req.candidates.len(), 1);
         assert_eq!(req.candidates[0].args, "-P\x01/usr/\x01-f");
     }
 
     #[test]
     fn parse_compcap_empty() {
-        let req = parse_compcap(b"", "cd", "");
+        let req = parse_compcap(b"", "cd", "", "cd ");
         assert!(req.candidates.is_empty());
     }
 }
