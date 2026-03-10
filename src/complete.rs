@@ -673,9 +673,9 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         }
     };
 
-    // Feed items through SkimItemReader (handles ANSI color processing)
+    // Feed items through SkimItemReader with ANSI enabled so lscolors codes render
     let items_text = display_lines.join("\n");
-    let item_reader = SkimItemReader::default();
+    let item_reader = SkimItemReader::new(SkimItemReaderOption::default().ansi(true));
     let items = item_reader.of_bufread(io::Cursor::new(items_text));
 
     let output = match Skim::run_with(skim_opts, Some(items)) {
