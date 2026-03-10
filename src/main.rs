@@ -162,6 +162,11 @@ fn main() {
         }
     };
 
+    // Clean up preview temp file
+    if let Some(ref tmp) = opts.preview_tmp {
+        let _ = std::fs::remove_file(tmp);
+    }
+
     // Handle abort (Esc / Ctrl-C)
     if output.is_abort {
         process::exit(130);
@@ -298,6 +303,8 @@ struct Opts {
     preview_window: Option<String>,
     expect_keys: Vec<String>,
     binds: Vec<String>,
+    /// Temp file for preview script (cleaned up on exit).
+    preview_tmp: Option<std::path::PathBuf>,
 }
 
 /// Parse fzf-compatible CLI arguments.
@@ -326,6 +333,7 @@ fn parse_args(args: &[String]) -> Opts {
         preview_window: None,
         expect_keys: Vec::new(),
         binds: Vec::new(),
+        preview_tmp: None,
     };
 
     let mut i = 0;
@@ -381,14 +389,29 @@ fn parse_args(args: &[String]) -> Opts {
         } else if let Some(val) = strip_eq_or_next(arg, "--tabstop", args, &mut i) {
             opts.tabstop = val.parse().unwrap_or(0);
         } else if let Some(val) = strip_eq_or_next(arg, "--preview", args, &mut i) {
-            // skim hardcodes /bin/sh for preview execution (preview.rs line 304/392).
-            // fzf-tab's preview init script uses zsh-specific features (zmodload, local -a,
-            // mapfile, etc.) and sets SHELL=$ZSH_NAME. Without this wrapping, the preview
-            // runs through /bin/sh and every zsh command fails with "command not found".
+            // skim hardcodes /bin/sh for preview execution.
+            // fzf-tab's preview init uses zsh-specific syntax ($'\0', $'\2',
+            // zmodload, mapfile, etc.) and sets SHELL=$ZSH_NAME.
+            //
+            // Previous approach: wrap in `$SHELL -c '<escaped>'` with single-quote
+            // escaping. This breaks when skim replaces placeholders in the command
+            // string — the replacement text (from completion items) can contain
+            // null bytes that truncate the C string argument mid-expression,
+            // producing `zsh: parse error near ')'`.
+            //
+            // Current approach: write the preview script to a temp file.
+            // The command becomes `$SHELL /tmp/file.sh` — no escaping needed,
+            // no placeholder replacement inside the script content.
             let shell = std::env::var("SHELL").unwrap_or_default();
             if !shell.is_empty() && shell != "sh" && shell != "/bin/sh" {
-                let escaped = val.replace('\'', "'\\''");
-                opts.preview = Some(format!("{shell} -c '{escaped}'"));
+                let tmp = std::env::temp_dir()
+                    .join(format!("skim-tab-preview-{}.sh", std::process::id()));
+                if std::fs::write(&tmp, &val).is_ok() {
+                    opts.preview = Some(format!("{shell} {}", tmp.display()));
+                    opts.preview_tmp = Some(tmp);
+                } else {
+                    opts.preview = Some(val);
+                }
             } else {
                 opts.preview = Some(val);
             }
@@ -520,6 +543,8 @@ mod tests {
 
     #[test]
     fn test_parse_args_preview() {
+        // When SHELL is sh or unset, preview is passed through unchanged
+        std::env::set_var("SHELL", "sh");
         let args: Vec<String> = vec![
             "--preview=bat --color=always {}",
             "--preview-window=right:50%:wrap",
@@ -531,6 +556,33 @@ mod tests {
         let opts = parse_args(&args);
         assert_eq!(opts.preview, Some("bat --color=always {}".to_string()));
         assert_eq!(opts.preview_window, Some("right:50%:wrap".to_string()));
+    }
+
+    #[test]
+    fn test_parse_args_preview_tempfile() {
+        // When SHELL is zsh, preview is written to a temp file
+        std::env::set_var("SHELL", "zsh");
+        let args: Vec<String> = vec!["--preview=echo hello"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+        let opts = parse_args(&args);
+        let preview = opts.preview.unwrap();
+        assert!(
+            preview.starts_with("zsh "),
+            "preview should start with shell: {preview}"
+        );
+        assert!(
+            preview.contains("skim-tab-preview-"),
+            "preview should reference temp file: {preview}"
+        );
+        // Verify the temp file was written with the script content
+        let path = preview.strip_prefix("zsh ").unwrap();
+        let content = std::fs::read_to_string(path).unwrap();
+        assert_eq!(content, "echo hello");
+        // Clean up
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
