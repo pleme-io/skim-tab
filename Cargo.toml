@@ -61,6 +61,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 lscolors = "0.20"
 serde_yaml = "0.9"
+shikumi = { git = "https://github.com/pleme-io/shikumi" }
 
 [profile.release]
 opt-level = "z"

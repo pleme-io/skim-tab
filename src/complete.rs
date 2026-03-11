@@ -6,9 +6,10 @@
 //!      with `--command`, `--query`, `--buffer` as CLI args (for the zsh widget)
 
 use crate::{
-    base_options, k8s, ANSI_DIM, ANSI_FROST, ANSI_GREEN, ANSI_PURPLE, ANSI_RESET, ANSI_YELLOW,
-    ICON_CD, ICON_K8S, ICON_POINTER,
+    base_options, config, k8s, ANSI_DIM, ANSI_FROST, ANSI_GREEN, ANSI_PURPLE, ANSI_RESET,
+    ANSI_YELLOW, ICON_CD, ICON_K8S, ICON_POINTER,
 };
+use config::CompletionMode;
 use lscolors::LsColors;
 use serde::{Deserialize, Serialize};
 use skim::prelude::*;
@@ -639,15 +640,38 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         return;
     }
 
+    let cfg = config::load();
+    let mode = cfg.completion.mode;
     let ls_colors = LsColors::from_env().unwrap_or_default();
     let base_cmd = completion_base_cmd(&req.command, &req.buffer);
     let is_k8s = tool_icon(&base_cmd).is_some();
+
+    // ── Enrichment: service mode (future gRPC client) ───────────
+    // When service or hybrid mode is active, we'll query the indexing
+    // service here. For now this is a placeholder — the gRPC client
+    // will be wired in when the service is built.
+    let service_enrichment: Option<K8sEnrichment> = if is_k8s && mode.use_service() {
+        // TODO: gRPC client call with cfg.completion.service.endpoint
+        //       and cfg.completion.service.timeout_ms
+        None // None = service unavailable (triggers direct fallback in hybrid)
+    } else {
+        None
+    };
+
+    // ── Enrichment: direct mode (local subprocess calls) ────────
+    // Runs when mode is Direct, or when Hybrid and service was unavailable.
+    let use_direct = mode == CompletionMode::Direct
+        || (mode == CompletionMode::Hybrid && service_enrichment.is_none());
 
     // Phase 1: K8s context for header/prompt (pure file read, ~0ms)
     let kube_ctx = if is_k8s { k8s::KubeContext::current() } else { None };
 
     // Phase 2: Resource counts for resource type candidates
-    let resource_counts = if is_k8s && has_resource_type_candidates(&req.candidates) {
+    let resource_counts = if use_direct
+        && is_k8s
+        && cfg.completion.direct.k8s_enrichment
+        && has_resource_type_candidates(&req.candidates)
+    {
         let types: Vec<&str> = req
             .candidates
             .iter()
@@ -661,7 +685,11 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
     };
 
     // Phase 3: Namespace enrichment
-    let (ns_pod_counts, active_ns) = if is_k8s && is_namespace_completion(&req.buffer) {
+    let (ns_pod_counts, active_ns) = if use_direct
+        && is_k8s
+        && cfg.completion.direct.k8s_enrichment
+        && is_namespace_completion(&req.buffer)
+    {
         let active = kube_ctx
             .as_ref()
             .map_or("default", |c| c.namespace.as_str())
