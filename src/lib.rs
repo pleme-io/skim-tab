@@ -6,6 +6,7 @@
 //! Theme: Nord (Arctic ice) with sleek Jedi-inspired iconography.
 
 pub mod complete;
+pub mod config;
 pub mod k8s;
 pub mod preview;
 
