@@ -1,0 +1,39 @@
+commands: [npm, pnpm, yarn]
+icon: "📦"
+subcommands:
+  install:
+    description: "Install dependencies"
+    glyph: "↻"
+  run:
+    description: "Run a script"
+    glyph: "▸"
+  test:
+    description: "Run tests"
+    glyph: "▸"
+  build:
+    description: "Build the project"
+    glyph: "◇"
+  start:
+    description: "Start the application"
+    glyph: "▸"
+  publish:
+    description: "Publish to registry"
+    glyph: "↻"
+  init:
+    description: "Create package.json"
+    glyph: "◇"
+  update:
+    description: "Update packages"
+    glyph: "↻"
+  audit:
+    description: "Run security audit"
+    glyph: "◈"
+  outdated:
+    description: "Check for outdated packages"
+    glyph: "◈"
+  link:
+    description: "Symlink a package"
+    glyph: "⊙"
+  uninstall:
+    description: "Remove a package"
+    glyph: "◇"

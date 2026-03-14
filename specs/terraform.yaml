@@ -1,0 +1,39 @@
+commands: [terraform, tofu]
+icon: "🏗"
+subcommands:
+  init:
+    description: "Initialize working directory"
+    glyph: "◇"
+  plan:
+    description: "Show execution plan"
+    glyph: "◈"
+  apply:
+    description: "Apply changes"
+    glyph: "◇"
+  destroy:
+    description: "Destroy infrastructure"
+    glyph: "◇"
+  validate:
+    description: "Validate configuration"
+    glyph: "◈"
+  fmt:
+    description: "Format configuration"
+    glyph: "◇"
+  state:
+    description: "Manage state"
+    glyph: "⊙"
+  output:
+    description: "Show output values"
+    glyph: "◈"
+  import:
+    description: "Import existing resources"
+    glyph: "◇"
+  workspace:
+    description: "Manage workspaces"
+    glyph: "⊙"
+  providers:
+    description: "Show providers"
+    glyph: "◈"
+  refresh:
+    description: "Update state"
+    glyph: "↻"

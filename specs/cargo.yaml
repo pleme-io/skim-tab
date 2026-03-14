@@ -1,0 +1,57 @@
+commands: [cargo]
+icon: "📦"
+subcommands:
+  build:
+    description: "Compile the current package"
+    glyph: "◇"
+  run:
+    description: "Run a binary or example"
+    glyph: "▸"
+  test:
+    description: "Run the tests"
+    glyph: "▸"
+  check:
+    description: "Check without building"
+    glyph: "◈"
+  clippy:
+    description: "Run Clippy lints"
+    glyph: "◈"
+  fmt:
+    description: "Format source code"
+    glyph: "◇"
+  bench:
+    description: "Run benchmarks"
+    glyph: "▸"
+  doc:
+    description: "Build documentation"
+    glyph: "◇"
+  clean:
+    description: "Remove build artifacts"
+    glyph: "◇"
+  update:
+    description: "Update dependencies"
+    glyph: "↻"
+  publish:
+    description: "Publish to crates.io"
+    glyph: "↻"
+  add:
+    description: "Add dependency to Cargo.toml"
+    glyph: "◇"
+  remove:
+    description: "Remove a dependency"
+    glyph: "◇"
+  init:
+    description: "Create new package in existing dir"
+    glyph: "◇"
+  new:
+    description: "Create a new Cargo package"
+    glyph: "◇"
+  install:
+    description: "Install a Rust binary"
+    glyph: "↻"
+  tree:
+    description: "Display dependency tree"
+    glyph: "◈"
+  nextest:
+    description: "Run tests via cargo-nextest"
+    glyph: "▸"

@@ -2338,6 +2338,7 @@ name = "skim-tab"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "crossterm",
  "lscolors",
  "regex",
  "rusqlite",

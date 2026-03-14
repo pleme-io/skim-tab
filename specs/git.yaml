@@ -1,0 +1,81 @@
+commands: [git]
+icon: "󰊢"
+subcommands:
+  status:
+    description: "Show working tree status"
+    glyph: "◈"
+  add:
+    description: "Stage file contents"
+    glyph: "◇"
+  commit:
+    description: "Record changes"
+    glyph: "◇"
+  push:
+    description: "Update remote refs"
+    glyph: "↻"
+  pull:
+    description: "Fetch and merge"
+    glyph: "↻"
+  fetch:
+    description: "Download objects and refs"
+    glyph: "↻"
+  checkout:
+    description: "Switch branches or restore"
+    glyph: "↻"
+  switch:
+    description: "Switch branches"
+    glyph: "↻"
+  branch:
+    description: "List, create, or delete branches"
+    glyph: "⊙"
+  merge:
+    description: "Join branches"
+    glyph: "↻"
+  rebase:
+    description: "Reapply commits on top"
+    glyph: "↻"
+  log:
+    description: "Show commit logs"
+    glyph: "◈"
+  diff:
+    description: "Show changes"
+    glyph: "◈"
+  stash:
+    description: "Stash working changes"
+    glyph: "⊙"
+  reset:
+    description: "Reset HEAD"
+    glyph: "◇"
+  restore:
+    description: "Restore working tree files"
+    glyph: "◇"
+  tag:
+    description: "Create, list, or verify tags"
+    glyph: "⊙"
+  remote:
+    description: "Manage remotes"
+    glyph: "⊙"
+  clone:
+    description: "Clone a repository"
+    glyph: "◇"
+  init:
+    description: "Create empty repo"
+    glyph: "◇"
+  worktree:
+    description: "Manage working trees"
+    glyph: "⊙"
+  bisect:
+    description: "Binary search for bugs"
+    glyph: "▸"
+  cherry-pick:
+    description: "Apply specific commits"
+    glyph: "◇"
+  revert:
+    description: "Revert commits"
+    glyph: "◇"
+  blame:
+    description: "Show line-by-line authorship"
+    glyph: "◈"
+  show:
+    description: "Show objects"
+    glyph: "◈"
