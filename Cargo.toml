@@ -62,6 +62,10 @@ serde_json = "1"
 lscolors = "0.20"
 serde_yaml = "0.9"
 shikumi = { git = "https://github.com/pleme-io/shikumi" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3"
 
 [profile.release]
 opt-level = "z"

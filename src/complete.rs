@@ -6,8 +6,8 @@
 //!      with `--command`, `--query`, `--buffer` as CLI args (for the zsh widget)
 
 use crate::{
-    base_options, config, k8s, ANSI_DIM, ANSI_FROST, ANSI_GREEN, ANSI_PURPLE, ANSI_RESET,
-    ANSI_YELLOW, ICON_CD, ICON_K8S, ICON_POINTER,
+    base_options, config, history_db::HistoryDb, k8s, specs::SpecRegistry, ANSI_DIM, ANSI_FROST,
+    ANSI_GREEN, ANSI_PURPLE, ANSI_RESET, ANSI_YELLOW, ICON_CD, ICON_K8S, ICON_POINTER,
 };
 use config::CompletionMode;
 use lscolors::LsColors;
@@ -279,9 +279,9 @@ fn colorize(
 fn build_description(word: &str, command: &str, k8s: &K8sEnrichment) -> Option<String> {
     let mut parts: Vec<String> = Vec::new();
 
-    // Static description from TOOL_REGISTRY
+    // Static description from YAML specs + TOOL_REGISTRY
     if let Some(desc) = lookup_description(word, command) {
-        parts.push(desc.to_string());
+        parts.push(desc);
     }
 
     // Phase 2: live resource count
@@ -595,17 +595,46 @@ static TOOL_REGISTRY: &[ToolDescriptions] = &[
     // },
 ];
 
-/// Look up a built-in description for a candidate word.
-fn lookup_description(word: &str, command: &str) -> Option<&'static str> {
+/// Look up a description for a candidate word.
+///
+/// Checks the YAML spec registry first (built-in + user + project specs),
+/// then falls back to the hardcoded `TOOL_REGISTRY`. Spec results include
+/// a glyph prefix (e.g., "◇ Build an image") to match the existing format.
+fn lookup_description(word: &str, command: &str) -> Option<String> {
     let base = command.split(':').next().unwrap_or(command);
+
+    // 1. Check YAML spec registry (global singleton)
+    let specs_cfg = config::SpecsConfig::default();
+    let registry = SpecRegistry::global(&specs_cfg);
+    if let Some((glyph, desc)) = registry.lookup(base, word) {
+        let formatted = if glyph.is_empty() {
+            desc
+        } else {
+            format!("{glyph} {desc}")
+        };
+        return Some(formatted);
+    }
+
+    // 2. Fall back to hardcoded TOOL_REGISTRY
     TOOL_REGISTRY
         .iter()
         .find(|t| t.matches(base))
         .and_then(|t| t.lookup(word))
+        .map(|s| s.to_string())
 }
 
 /// Get the prompt icon for a command, or None for the default.
-fn tool_icon(command: &str) -> Option<&'static str> {
+///
+/// Checks the YAML spec registry first, then falls back to `TOOL_REGISTRY`.
+fn tool_icon(command: &str) -> Option<&str> {
+    // 1. Check YAML spec registry
+    let specs_cfg = config::SpecsConfig::default();
+    let registry = SpecRegistry::global(&specs_cfg);
+    if let Some(icon) = registry.icon(command) {
+        return Some(icon);
+    }
+
+    // 2. Fall back to hardcoded TOOL_REGISTRY
     TOOL_REGISTRY
         .iter()
         .find(|t| t.matches(command))
@@ -658,13 +687,18 @@ fn completion_base_cmd(command: &str, buffer: &str) -> String {
 
 // ── Completion runner ────────────────────────────────────────────────
 
-fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
+fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     if req.candidates.is_empty() {
         print_response("abort", &[], output_mode);
         return;
     }
 
     let cfg = config::load();
+
+    // Initialize the YAML spec registry with user config (lazy singleton —
+    // first call wins, so we seed it here with the real config before any
+    // lookup_description / tool_icon calls).
+    SpecRegistry::global(&cfg.completion.specs);
 
     // Single candidate: auto-select or show picker based on config
     if req.candidates.len() == 1 && cfg.completion.single_auto_select {
@@ -679,6 +713,19 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         }
 
         print_response("select", &[sel], output_mode);
+        return;
+    }
+
+    // Smart menu threshold: auto-insert all when candidate count is below
+    // min_candidates but above 1 (skip skim picker for small sets).
+    let min = cfg.completion.picker.min_candidates;
+    if req.candidates.len() > 1 && req.candidates.len() < min {
+        let selections: Vec<Selection> = req
+            .candidates
+            .iter()
+            .map(|c| c.to_selection_with_config(&cfg.completion))
+            .collect();
+        print_response("select", &selections, output_mode);
         return;
     }
 
@@ -750,6 +797,33 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         active_ns,
     };
 
+    // ── Frecency: open history DB and reorder candidates ────────
+    let history_db = if cfg.completion.enrichment.history_boost || cfg.completion.enrichment.frecency
+    {
+        HistoryDb::open().ok()
+    } else {
+        None
+    };
+
+    if cfg.completion.enrichment.frecency {
+        if let Some(ref db) = history_db {
+            let cwd = std::env::current_dir()
+                .map(|d| d.to_string_lossy().to_string())
+                .unwrap_or_default();
+            if let Ok(scores) = db.frecency_scores(&base_cmd, &cwd) {
+                if !scores.is_empty() {
+                    // Stable sort: candidates with higher frecency come first,
+                    // candidates without history preserve their original order.
+                    req.candidates.sort_by(|a, b| {
+                        let sa = scores.get(&a.word).copied().unwrap_or(0.0);
+                        let sb = scores.get(&b.word).copied().unwrap_or(0.0);
+                        sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                }
+            }
+        }
+    }
+
     let display_lines: Vec<String> = req
         .candidates
         .iter()
@@ -767,15 +841,39 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
 
     let mut builder = base_options(&req.query);
     builder
-        .multi(false)
+        .multi(cfg.completion.picker.multi_select)
         .prompt(prompt)
-        .height("40%".to_string())
-        .cycle(true)
-        .no_sort(true);
+        .height(cfg.completion.picker.height.clone())
+        .cycle(cfg.completion.picker.cycle)
+        .no_sort(cfg.completion.picker.no_sort);
 
-    // Phase 1: context header
+    // Group switching header (R2b): show group count info when candidates have groups
+    let mut header_parts: Vec<String> = Vec::new();
+
+    if cfg.completion.picker.show_group_header {
+        let mut group_names: Vec<&str> = Vec::new();
+        for c in &req.candidates {
+            if !c.group.is_empty() && !group_names.contains(&c.group.as_str()) {
+                group_names.push(&c.group);
+            }
+        }
+        if group_names.len() > 1 {
+            let names = group_names.join(", ");
+            header_parts.push(format!(
+                "{} groups: {} | F1/F2: switch",
+                group_names.len(),
+                names
+            ));
+        }
+    }
+
+    // Phase 1: context header (K8s)
     if let Some(ref ctx) = kube_ctx {
-        builder.header(ctx.header());
+        header_parts.push(ctx.header());
+    }
+
+    if !header_parts.is_empty() {
+        builder.header(header_parts.join(" | "));
     }
 
     // Write preview manifest for the --preview callback
@@ -866,6 +964,18 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
             let final_sel = crate::descent::run_descent(sc, &selections[0], &req.command, matches!(output_mode, OutputMode::Eval));
             print_response("select", &[final_sel], output_mode);
             return;
+        }
+    }
+
+    // ── History: record selections ────────────────────────────────
+    if cfg.completion.enrichment.history_boost && !selections.is_empty() {
+        if let Some(ref db) = history_db {
+            let cwd = std::env::current_dir()
+                .map(|d| d.to_string_lossy().to_string())
+                .unwrap_or_default();
+            for sel in &selections {
+                let _ = db.record(&base_cmd, &cwd, &sel.word);
+            }
         }
     }
 
@@ -1218,21 +1328,21 @@ mod tests {
 
     #[test]
     fn lookup_description_kubectl() {
-        assert_eq!(lookup_description("pods", "kubectl"), Some("◉ Pod workloads"));
-        assert_eq!(lookup_description("deploy", "k"), Some("◎ Managed replicas"));
+        assert_eq!(lookup_description("pods", "kubectl").as_deref(), Some("◉ Pod workloads"));
+        assert_eq!(lookup_description("deploy", "k").as_deref(), Some("◎ Managed replicas"));
         assert_eq!(lookup_description("unknown-thing", "kubectl"), None);
     }
 
     #[test]
     fn lookup_description_helm() {
-        assert_eq!(lookup_description("upgrade", "helm"), Some("◇ Upgrade a release"));
+        assert_eq!(lookup_description("upgrade", "helm").as_deref(), Some("◇ Upgrade a release"));
         assert_eq!(lookup_description("nope", "helm"), None);
     }
 
     #[test]
     fn lookup_description_flux() {
-        assert_eq!(lookup_description("reconcile", "flux"), Some("↻ Trigger reconciliation"));
-        assert_eq!(lookup_description("hr", "flux"), Some("⊕ Helm release reconciler"));
+        assert_eq!(lookup_description("reconcile", "flux").as_deref(), Some("↻ Trigger reconciliation"));
+        assert_eq!(lookup_description("hr", "flux").as_deref(), Some("⊕ Helm release reconciler"));
         assert_eq!(lookup_description("nope", "flux"), None);
     }
 

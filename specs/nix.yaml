@@ -1,0 +1,49 @@
+commands: [nix]
+icon: "\u2744"
+subcommands:
+  build:
+    description: "Build a derivation"
+    glyph: "\u25C7"
+  run:
+    description: "Run a flake app"
+    glyph: "\u25B8"
+  develop:
+    description: "Enter dev shell"
+    glyph: "\u25B8"
+  flake:
+    description: "Flake operations"
+    glyph: "\u2299"
+    subcommands:
+      update:
+        description: "Update flake inputs"
+        glyph: "\u21BB"
+      check:
+        description: "Check flake outputs"
+        glyph: "\u25C8"
+      show:
+        description: "Show flake outputs"
+        glyph: "\u25C8"
+      lock:
+        description: "Update flake.lock"
+        glyph: "\u21BB"
+      metadata:
+        description: "Show flake metadata"
+        glyph: "\u25C8"
+  search:
+    description: "Search packages"
+    glyph: "\u25C8"
+  profile:
+    description: "Manage profiles"
+    glyph: "\u2299"
+  store:
+    description: "Nix store operations"
+    glyph: "\u2299"
+  eval:
+    description: "Evaluate expression"
+    glyph: "\u25C8"
+  repl:
+    description: "Interactive REPL"
+    glyph: "\u25B8"
+  path-info:
+    description: "Store path info"
+    glyph: "\u25C8"

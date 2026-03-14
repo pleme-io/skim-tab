@@ -1,0 +1,36 @@
+commands: [docker, podman]
+icon: "\U0001F433"
+subcommands:
+  run:
+    description: "Run a container"
+    glyph: "\u25B8"
+  build:
+    description: "Build an image"
+    glyph: "\u25C7"
+  ps:
+    description: "List containers"
+    glyph: "\u25C8"
+  images:
+    description: "List images"
+    glyph: "\u25C8"
+  pull:
+    description: "Pull an image"
+    glyph: "\u21BB"
+  push:
+    description: "Push an image"
+    glyph: "\u21BB"
+  exec:
+    description: "Execute in container"
+    glyph: "\u25B8"
+  logs:
+    description: "Container logs"
+    glyph: "\u25C8"
+  stop:
+    description: "Stop containers"
+    glyph: "\u21BB"
+  rm:
+    description: "Remove containers"
+    glyph: "\u25C7"
+  compose:
+    description: "Docker Compose"
+    glyph: "\u2299"

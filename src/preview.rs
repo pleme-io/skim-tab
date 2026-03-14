@@ -2,6 +2,13 @@
 //!
 //! Self-contained module: takes strings, returns strings. No dependency
 //! on skim types or the completion protocol.
+//!
+//! ## Preview dispatch
+//!
+//! The preview binary (`skim-tab --preview`) receives a manifest path and the
+//! selected item text.  It reads the manifest to get command context, resolves
+//! the candidate, and dispatches to the appropriate preview handler via
+//! `detect_preview_type`.
 
 use std::path::Path;
 use std::process::Command;
@@ -74,7 +81,81 @@ fn find_flag<'a>(words: &[&'a str], flags: &[&str]) -> Option<&'a str> {
     None
 }
 
+// ── Preview type dispatch ───────────────────────────────────────────
+
+/// Categorized preview type for dispatch.
+enum PreviewType {
+    Directory(String),
+    File(String),
+    GitBranch(String),
+    GitFile(String),
+    K8sResource { _tool: String, _ctx: String, _word: String },
+    Process(String),
+    Generic(String),
+}
+
+/// Detect the appropriate preview type from command context and candidate.
+fn detect_preview_type(command: &str, buffer: &str, word: &str, realdir: &str) -> PreviewType {
+    let ctx = BufferContext::parse(buffer, command);
+
+    // K8s tools get their own dispatch (handled separately in preview())
+    if matches!(ctx.base_cmd, "kubectl" | "kubecolor" | "k" | "flux" | "helm") {
+        return PreviewType::K8sResource {
+            _tool: ctx.base_cmd.to_string(),
+            _ctx: buffer.to_string(),
+            _word: word.to_string(),
+        };
+    }
+
+    // Process previews
+    if matches!(command, "kill" | "ps") {
+        return PreviewType::Process(word.to_string());
+    }
+
+    // Git command previews
+    if command.starts_with("git-checkout")
+        || command.starts_with("git-switch")
+        || command.starts_with("git-merge")
+        || command.starts_with("git-rebase")
+    {
+        // If the candidate looks like a branch name (not a file path)
+        if !word.contains('/') || !Path::new(word).exists() {
+            return PreviewType::GitBranch(word.to_string());
+        }
+    }
+
+    if command.starts_with("git-add")
+        || command.starts_with("git-diff")
+        || command.starts_with("git-restore")
+    {
+        return PreviewType::GitFile(word.to_string());
+    }
+
+    if command.starts_with("git-log") {
+        return PreviewType::GitBranch(word.to_string());
+    }
+
+    // Resolve filesystem path
+    let path = if realdir.is_empty() {
+        word.to_string()
+    } else {
+        format!("{realdir}{word}")
+    };
+
+    let p = Path::new(&path);
+    if p.is_dir() {
+        PreviewType::Directory(path)
+    } else if p.is_file() {
+        PreviewType::File(path)
+    } else {
+        PreviewType::Generic(word.to_string())
+    }
+}
+
 // ── Public interface ──────────────────────────────────────────────────
+
+/// Default max lines for preview output.
+const DEFAULT_MAX_LINES: usize = 30;
 
 /// Generate a preview string for a completion candidate.
 pub fn preview(word: &str, command: &str, buffer: &str, realdir: &str) -> String {
@@ -99,16 +180,23 @@ pub fn preview(word: &str, command: &str, buffer: &str, realdir: &str) -> String
         format!("{realdir}{word}")
     };
 
-    match command {
-        "cd" | "pushd" | "z" => preview_dir(&path),
-        "kill" | "ps" => preview_proc(word),
-        cmd if cmd.starts_with("git-add")
-            || cmd.starts_with("git-diff")
-            || cmd.starts_with("git-restore") => preview_git("diff", word),
-        cmd if cmd.starts_with("git-log") => preview_git("log", word),
-        cmd if cmd.starts_with("git-checkout") => preview_git("checkout", word),
-        "" => try_path_then_command(&path, word),
-        _ => preview_default(&path, word, command),
+    match detect_preview_type(command, buffer, word, realdir) {
+        PreviewType::Directory(p) => preview_dir(&p, DEFAULT_MAX_LINES),
+        PreviewType::File(p) => preview_file(&p, DEFAULT_MAX_LINES),
+        PreviewType::GitBranch(name) => preview_git_branch(&name),
+        PreviewType::GitFile(file) => preview_git_diff(&file, DEFAULT_MAX_LINES),
+        PreviewType::Process(pid) => preview_proc(&pid),
+        PreviewType::K8sResource { .. } => {
+            // Already handled above; unreachable in practice
+            String::new()
+        }
+        PreviewType::Generic(text) => {
+            match command {
+                "cd" | "pushd" | "z" => preview_dir(&path, DEFAULT_MAX_LINES),
+                "" => try_path_then_command(&path, &text, DEFAULT_MAX_LINES),
+                _ => preview_default(&path, &text, command, DEFAULT_MAX_LINES),
+            }
+        }
     }
 }
 
@@ -162,7 +250,7 @@ fn preview_kubectl(ctx: &BufferContext, candidate: &str) -> String {
         "scale" if !sub1.is_empty() => {
             run("kubectl", &with_ns(&["get", sub1, candidate, "-o", "wide"], &ns))
         }
-        "apply" | "create" => try_path_then_command(candidate, candidate),
+        "apply" | "create" => try_path_then_command(candidate, candidate, DEFAULT_MAX_LINES),
         "" if candidate.starts_with('-') => preview_command("kubectl"),
         "" => preview_subcommand("kubectl", candidate),
         _ => preview_command("kubectl"),
@@ -243,22 +331,22 @@ fn preview_subcommand(tool: &str, subcmd: &str) -> String {
 
 // ── Generic previewers ───────────────────────────────────────────────
 
-fn try_path_then_command(path: &str, word: &str) -> String {
+fn try_path_then_command(path: &str, word: &str, max_lines: usize) -> String {
     if Path::new(path).is_dir() {
-        preview_dir(path)
+        preview_dir(path, max_lines)
     } else if Path::new(path).is_file() {
-        preview_file(path)
+        preview_file(path, max_lines)
     } else {
         preview_command(word)
     }
 }
 
-fn preview_default(path: &str, word: &str, command: &str) -> String {
+fn preview_default(path: &str, word: &str, command: &str, max_lines: usize) -> String {
     if Path::new(path).is_dir() {
-        return preview_dir(path);
+        return preview_dir(path, max_lines);
     }
     if Path::new(path).is_file() {
-        return preview_file(path);
+        return preview_file(path, max_lines);
     }
     if word.starts_with('-') {
         return preview_command(command);
@@ -267,25 +355,201 @@ fn preview_default(path: &str, word: &str, command: &str) -> String {
     if result.is_empty() { preview_command(command) } else { result }
 }
 
-fn preview_dir(path: &str) -> String {
-    run("eza", &["--tree", "--level=2", "--icons", "--color=always", path])
+// ── R3a: Enhanced directory preview ─────────────────────────────────
+
+/// Preview a directory with entry listing and count header.
+///
+/// Prefers `eza -la --icons --color=always --no-user --no-time` for rich
+/// output; falls back to `ls -la` if eza is not available.
+fn preview_dir(path: &str, max_lines: usize) -> String {
+    let entry_count = std::fs::read_dir(path)
+        .map(|rd| rd.count())
+        .unwrap_or(0);
+
+    let header = format!("  \x1b[1;36m{}\x1b[0m  ({} entries)\n\n", path, entry_count);
+
+    let body = if has_tool("eza") {
+        run("eza", &[
+            "-la", "--icons", "--color=always", "--no-user", "--no-time", path,
+        ])
+    } else {
+        run("ls", &["-la", path])
+    };
+
+    let limited: String = body
+        .lines()
+        .take(max_lines)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!("{header}{limited}")
 }
 
-fn preview_file(path: &str) -> String {
-    run("bat", &["--color=always", "--style=numbers", "--line-range=:200", path])
+// ── R3b: Enhanced file preview ──────────────────────────────────────
+
+/// Known binary file extensions that should not be previewed as text.
+const BINARY_EXTENSIONS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "bmp", "ico", "webp", "tiff", "tif", "svg",
+    "mp3", "mp4", "mkv", "avi", "mov", "flac", "wav", "ogg", "opus", "aac",
+    "zip", "tar", "gz", "bz2", "xz", "zst", "7z", "rar",
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+    "exe", "dll", "so", "dylib", "a", "o", "obj",
+    "wasm", "class", "pyc", "pyo",
+    "sqlite", "db", "sqlite3",
+];
+
+/// Image extensions for dimension info.
+const IMAGE_EXTENSIONS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "bmp", "ico", "webp", "tiff", "tif", "svg",
+];
+
+/// Detect whether a file is binary by extension, falling back to the `file` command.
+fn is_binary_file(path: &str) -> bool {
+    if let Some(ext) = Path::new(path).extension().and_then(|e| e.to_str()) {
+        let ext_lower = ext.to_ascii_lowercase();
+        if BINARY_EXTENSIONS.contains(&ext_lower.as_str()) {
+            return true;
+        }
+    }
+    // Fall back to `file` command for detection
+    let file_output = run("file", &["--brief", path]);
+    file_output.contains("data")
+        || file_output.contains("executable")
+        || file_output.contains("binary")
+        || file_output.contains("archive")
+        || file_output.contains("compressed")
+}
+
+/// Check if the file has an image extension.
+fn is_image_file(path: &str) -> bool {
+    Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|ext| IMAGE_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+/// Format a byte count into a human-readable size string.
+fn human_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * KB;
+    const GB: u64 = 1024 * MB;
+
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+/// Preview a file with type-aware rendering.
+///
+/// - **Text files:** Uses `bat` for syntax-highlighted preview with line
+///   numbers; falls back to `head` if bat is not available.
+/// - **Image files:** Shows dimensions and file info.
+/// - **Binary files:** Shows `file` type output and size.
+fn preview_file(path: &str, max_lines: usize) -> String {
+    if is_image_file(path) {
+        return preview_image_file(path);
+    }
+
+    if is_binary_file(path) {
+        return preview_binary_file(path);
+    }
+
+    // Text file: bat with fallback to head
+    preview_text_file(path, max_lines)
+}
+
+/// Preview a text file with syntax highlighting.
+fn preview_text_file(path: &str, max_lines: usize) -> String {
+    let range = format!(":{max_lines}");
+
+    if has_tool("bat") {
+        let output = run("bat", &[
+            "--color=always",
+            "--style=numbers,changes",
+            &format!("--line-range={range}"),
+            path,
+        ]);
+        if !output.is_empty() {
+            return output;
+        }
+    }
+
+    // Fallback: head
+    let n = max_lines.to_string();
+    run("head", &[&format!("-{n}"), path])
+}
+
+/// Preview a binary file with type and size info.
+fn preview_binary_file(path: &str) -> String {
+    let file_type = run("file", &["--brief", path]).trim().to_string();
+    let size = std::fs::metadata(path)
+        .map(|m| human_size(m.len()))
+        .unwrap_or_else(|_| "unknown".to_string());
+
+    format!(
+        "  \x1b[1;36m{}\x1b[0m\n\n\
+         \x1b[33mType:\x1b[0m  {}\n\
+         \x1b[33mSize:\x1b[0m  {}",
+        path, file_type, size
+    )
+}
+
+/// Preview an image file with dimensions and info.
+fn preview_image_file(path: &str) -> String {
+    let file_info = run("file", &["--brief", path]).trim().to_string();
+    let size = std::fs::metadata(path)
+        .map(|m| human_size(m.len()))
+        .unwrap_or_else(|_| "unknown".to_string());
+
+    format!(
+        "  \x1b[1;36m{}\x1b[0m\n\n\
+         \x1b[33mType:\x1b[0m  {}\n\
+         \x1b[33mSize:\x1b[0m  {}",
+        path, file_info, size
+    )
+}
+
+// ── R3d: Git preview ────────────────────────────────────────────────
+
+/// Preview a git branch: show recent commit log.
+fn preview_git_branch(name: &str) -> String {
+    let output = run("git", &[
+        "log", "--oneline", "--color=always", "--graph", "-10", name,
+    ]);
+    if output.is_empty() {
+        return format!("  Branch: {name}\n  (no commits or not found)");
+    }
+    format!("  \x1b[1;36mBranch:\x1b[0m {name}\n\n{output}")
+}
+
+/// Preview a git file diff with line limit.
+fn preview_git_diff(file: &str, max_lines: usize) -> String {
+    let output = run("git", &["diff", "--color=always", "--", file]);
+    if output.is_empty() {
+        // No staged/unstaged diff — show the file content instead
+        let status = run("git", &["status", "--short", "--", file]);
+        if status.is_empty() {
+            return format!("  {file}\n  (no changes)");
+        }
+        return format!("  \x1b[1;36m{file}\x1b[0m\n\n{status}");
+    }
+    let limited: String = output
+        .lines()
+        .take(max_lines)
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("  \x1b[1;36m{file}\x1b[0m\n\n{limited}")
 }
 
 fn preview_proc(word: &str) -> String {
     run("ps", &["-p", word, "-o", "pid,ppid,%cpu,%mem,start,command"])
-}
-
-fn preview_git(subcmd: &str, word: &str) -> String {
-    match subcmd {
-        "diff" => run("git", &["diff", "--color=always", "--", word]),
-        "log" => run("git", &["log", "--oneline", "--graph", "--color=always", "-20", word]),
-        "checkout" => run("git", &["log", "--oneline", "--graph", "--color=always", "-10", word]),
-        _ => String::new(),
-    }
 }
 
 /// Preview a command using tldr with fallback to --help.
@@ -306,6 +570,19 @@ fn preview_command(cmd: &str) -> String {
         }
     }
     String::new()
+}
+
+// ── Tool availability ───────────────────────────────────────────────
+
+/// Check if an external tool is available on PATH.
+fn has_tool(name: &str) -> bool {
+    Command::new("which")
+        .arg(name)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 // ── Shell helpers ────────────────────────────────────────────────────
@@ -428,5 +705,155 @@ mod tests {
     fn buffer_context_skips_boolean_flags() {
         let ctx = BufferContext::parse("kubectl get pods --watch --all-namespaces", "");
         assert_eq!(ctx.subcmds, vec!["get", "pods"]);
+    }
+
+    // ── R3 dispatch tests ───────────────────────────────────────────
+
+    #[test]
+    fn detect_git_checkout_as_branch() {
+        match detect_preview_type("git-checkout", "git checkout", "main", "") {
+            PreviewType::GitBranch(name) => assert_eq!(name, "main"),
+            _ => panic!("expected GitBranch"),
+        }
+    }
+
+    #[test]
+    fn detect_git_switch_as_branch() {
+        match detect_preview_type("git-switch", "git switch", "feature/foo", "") {
+            PreviewType::GitBranch(name) => assert_eq!(name, "feature/foo"),
+            _ => panic!("expected GitBranch"),
+        }
+    }
+
+    #[test]
+    fn detect_git_merge_as_branch() {
+        match detect_preview_type("git-merge", "git merge", "develop", "") {
+            PreviewType::GitBranch(name) => assert_eq!(name, "develop"),
+            _ => panic!("expected GitBranch"),
+        }
+    }
+
+    #[test]
+    fn detect_git_rebase_as_branch() {
+        match detect_preview_type("git-rebase", "git rebase", "main", "") {
+            PreviewType::GitBranch(name) => assert_eq!(name, "main"),
+            _ => panic!("expected GitBranch"),
+        }
+    }
+
+    #[test]
+    fn detect_git_add_as_file() {
+        match detect_preview_type("git-add", "git add", "src/main.rs", "") {
+            PreviewType::GitFile(path) => assert_eq!(path, "src/main.rs"),
+            _ => panic!("expected GitFile"),
+        }
+    }
+
+    #[test]
+    fn detect_git_diff_as_file() {
+        match detect_preview_type("git-diff", "git diff", "Cargo.toml", "") {
+            PreviewType::GitFile(path) => assert_eq!(path, "Cargo.toml"),
+            _ => panic!("expected GitFile"),
+        }
+    }
+
+    #[test]
+    fn detect_git_restore_as_file() {
+        match detect_preview_type("git-restore", "git restore", "README.md", "") {
+            PreviewType::GitFile(path) => assert_eq!(path, "README.md"),
+            _ => panic!("expected GitFile"),
+        }
+    }
+
+    #[test]
+    fn detect_git_log_as_branch() {
+        match detect_preview_type("git-log", "git log", "main", "") {
+            PreviewType::GitBranch(name) => assert_eq!(name, "main"),
+            _ => panic!("expected GitBranch"),
+        }
+    }
+
+    #[test]
+    fn detect_kill_as_process() {
+        match detect_preview_type("kill", "", "12345", "") {
+            PreviewType::Process(pid) => assert_eq!(pid, "12345"),
+            _ => panic!("expected Process"),
+        }
+    }
+
+    #[test]
+    fn detect_kubectl_as_k8s() {
+        match detect_preview_type("kubectl", "kubectl get pods", "my-pod", "") {
+            PreviewType::K8sResource { _tool, .. } => assert_eq!(_tool, "kubectl"),
+            _ => panic!("expected K8sResource"),
+        }
+    }
+
+    #[test]
+    fn detect_nonexistent_path_as_generic() {
+        match detect_preview_type("", "", "nonexistent-thing-xyz", "") {
+            PreviewType::Generic(text) => assert_eq!(text, "nonexistent-thing-xyz"),
+            _ => panic!("expected Generic"),
+        }
+    }
+
+    #[test]
+    fn human_size_bytes() {
+        assert_eq!(human_size(500), "500 B");
+    }
+
+    #[test]
+    fn human_size_kilobytes() {
+        assert_eq!(human_size(2048), "2.0 KB");
+    }
+
+    #[test]
+    fn human_size_megabytes() {
+        assert_eq!(human_size(1_500_000), "1.4 MB");
+    }
+
+    #[test]
+    fn human_size_gigabytes() {
+        assert_eq!(human_size(2_000_000_000), "1.9 GB");
+    }
+
+    #[test]
+    fn binary_extension_detected() {
+        assert!(BINARY_EXTENSIONS.contains(&"png"));
+        assert!(BINARY_EXTENSIONS.contains(&"zip"));
+        assert!(BINARY_EXTENSIONS.contains(&"pdf"));
+        assert!(!BINARY_EXTENSIONS.contains(&"rs"));
+        assert!(!BINARY_EXTENSIONS.contains(&"txt"));
+    }
+
+    #[test]
+    fn image_extension_detected() {
+        assert!(is_image_file("photo.png"));
+        assert!(is_image_file("image.JPG"));
+        assert!(is_image_file("art.webp"));
+        assert!(!is_image_file("code.rs"));
+        assert!(!is_image_file("data.zip"));
+    }
+
+    #[test]
+    fn preview_dir_for_existing_dir() {
+        // /tmp always exists on macOS/Linux
+        let output = preview_dir("/tmp", 10);
+        assert!(output.contains("/tmp"));
+        assert!(output.contains("entries"));
+    }
+
+    #[test]
+    fn preview_text_file_for_cargo_toml() {
+        let output = preview_text_file("Cargo.toml", 5);
+        assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn detect_directory_preview() {
+        match detect_preview_type("", "", "/tmp", "") {
+            PreviewType::Directory(p) => assert_eq!(p, "/tmp"),
+            _ => panic!("expected Directory for /tmp"),
+        }
     }
 }
