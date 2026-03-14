@@ -7,6 +7,7 @@
 
 pub mod complete;
 pub mod config;
+pub mod descent;
 pub mod k8s;
 pub mod preview;
 

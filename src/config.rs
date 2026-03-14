@@ -50,6 +50,13 @@ pub struct CompletionConfig {
 
     /// Direct-mode settings (kubectl enrichment, etc.).
     pub direct: DirectConfig,
+
+    /// In-picker directory descent: when true, selecting a directory in the
+    /// skim picker triggers an in-process readdir + new skim session, letting
+    /// you navigate a directory tree without returning to zsh between levels.
+    /// When false (default), directories are returned to zsh with a trailing /
+    /// and the user tabs again for the next level.
+    pub in_picker_descent: bool,
 }
 
 impl Default for CompletionConfig {
@@ -58,6 +65,7 @@ impl Default for CompletionConfig {
             mode: CompletionMode::Direct,
             service: ServiceConfig::default(),
             direct: DirectConfig::default(),
+            in_picker_descent: false,
         }
     }
 }
