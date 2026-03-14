@@ -7139,6 +7139,10 @@ rec {
             packageId = "anyhow";
           }
           {
+            name = "crossterm";
+            packageId = "crossterm";
+          }
+          {
             name = "lscolors";
             packageId = "lscolors";
           }
