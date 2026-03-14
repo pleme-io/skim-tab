@@ -778,26 +778,8 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
                     break;
                 }
 
-                // Fast path: single-child directory chain — auto-descend
-                // without showing skim (e.g., `cd .claude/<TAB>` → worktrees
-                // when worktrees is the only child).
-                if sub_candidates.len() == 1 {
-                    let only = &sub_candidates[0];
-                    let only_fs = candidate_fs_path(only);
-                    if Path::new(&only_fs).is_dir() {
-                        current_word = only.word.clone();
-                        current_fs = only_fs;
-                        continue;
-                    }
-                    // Single non-directory child — return it directly
-                    let final_sel = Selection {
-                        word: only.word.clone(),
-                        ..sel.clone()
-                    };
-                    print_response("select", &[final_sel], output_mode);
-                    return;
-                }
-
+                // Always show skim — let the user choose their depth.
+                // Enter descends, ESC accepts the current directory.
                 match run_descent_picker(&sub_candidates, &path_display, &ls_colors) {
                     Some(selected_display) => {
                         if let Some(sub) = sub_candidates.iter().find(|c| c.display == selected_display) {
@@ -1033,29 +1015,6 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
                     if sub_candidates.is_empty() {
                         // Empty directory — accept current path as-is
                         break;
-                    }
-
-                    // Fast path: single-child directory chain — auto-descend
-                    // without showing skim.
-                    if sub_candidates.len() == 1 {
-                        let only = &sub_candidates[0];
-                        let only_fs = candidate_fs_path(only);
-                        if Path::new(&only_fs).is_dir() {
-                            current_word = only.word.clone();
-                            current_fs = only_fs;
-                            continue;
-                        }
-                        // Single non-directory child — return it directly
-                        let final_sel = Selection {
-                            word: only.word.clone(),
-                            prefix: sel.prefix.clone(),
-                            suffix: sel.suffix.clone(),
-                            iprefix: sel.iprefix.clone(),
-                            isuffix: sel.isuffix.clone(),
-                            args: sel.args.clone(),
-                        };
-                        print_response("select", &[final_sel], output_mode);
-                        return;
                     }
 
                     match run_descent_picker(&sub_candidates, &path_display, &ls_colors) {
