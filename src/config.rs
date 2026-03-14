@@ -24,6 +24,9 @@
 //!     cycle: true                  # wrap around at top/bottom
 //!     sort: false                  # preserve completion order (no re-sort)
 //!     group_colors: true           # colorize completion groups differently
+//!     min_candidates: 2            # threshold to show picker (below = auto-insert all)
+//!     multi_select: false          # enable tab multi-select in picker
+//!     show_group_header: true      # show group count info in picker header
 //!   dir_handling:
 //!     append_slash: true           # append / to directory words
 //!     skip_trailing_space: true    # no space after dirs (enables tab-dance)
@@ -31,6 +34,9 @@
 //!     lscolors: true               # colorize file candidates via LS_COLORS
 //!     descriptions: true           # add command/subcommand descriptions
 //!     k8s_live: true               # live kubectl resource counts
+//!     project_detection: true      # detect project type from CWD markers
+//!     history_boost: false         # SQLite selection history (opt-in)
+//!     frecency: false              # frecency-based candidate reordering (opt-in)
 //! ```
 
 use serde::{Deserialize, Serialize};
@@ -88,6 +94,9 @@ pub struct CompletionConfig {
 
     /// Candidate enrichment (colors, descriptions, live data).
     pub enrichment: EnrichmentConfig,
+
+    /// YAML completion spec configuration.
+    pub specs: SpecsConfig,
 }
 
 impl Default for CompletionConfig {
@@ -102,6 +111,7 @@ impl Default for CompletionConfig {
             picker: PickerConfig::default(),
             dir_handling: DirHandlingConfig::default(),
             enrichment: EnrichmentConfig::default(),
+            specs: SpecsConfig::default(),
         }
     }
 }
@@ -183,6 +193,19 @@ pub struct PickerConfig {
 
     /// Colorize completion groups with different accents.
     pub group_colors: bool,
+
+    /// Minimum candidates required to show the skim picker.
+    /// Below this threshold (but above 1), all candidates are auto-inserted
+    /// (like single_auto_select but for small counts). Default: 2.
+    pub min_candidates: usize,
+
+    /// Enable multi-select in the skim picker (tab to mark items).
+    /// When true, multiple selections are batch-inserted.
+    pub multi_select: bool,
+
+    /// Show group count info in the skim header when candidates have groups.
+    /// e.g., "3 groups: files, flags, subcommands"
+    pub show_group_header: bool,
 }
 
 impl Default for PickerConfig {
@@ -192,6 +215,9 @@ impl Default for PickerConfig {
             cycle: true,
             no_sort: true,
             group_colors: true,
+            min_candidates: 2,
+            multi_select: false,
+            show_group_header: true,
         }
     }
 }
@@ -232,6 +258,15 @@ pub struct EnrichmentConfig {
 
     /// Enable live kubectl resource counts for K8s completions.
     pub k8s_live: bool,
+
+    /// Detect project type from CWD marker files (Cargo.toml, package.json, etc.).
+    pub project_detection: bool,
+
+    /// Record selections and boost candidates via SQLite history (opt-in).
+    pub history_boost: bool,
+
+    /// Reorder candidates by frecency score before display (opt-in, requires history_boost).
+    pub frecency: bool,
 }
 
 impl Default for EnrichmentConfig {
@@ -240,6 +275,36 @@ impl Default for EnrichmentConfig {
             lscolors: true,
             descriptions: true,
             k8s_live: true,
+            project_detection: true,
+            history_boost: false,
+            frecency: false,
+        }
+    }
+}
+
+// ── Specs config ────────────────────────────────────────────────────
+
+/// YAML completion spec loading configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SpecsConfig {
+    /// Enable YAML spec loading (built-in + user + project specs).
+    pub enable: bool,
+
+    /// Directories to load user spec YAML files from.
+    /// Supports `~` expansion. Default: `["~/.config/skim-tab/specs"]`.
+    pub dirs: Vec<String>,
+
+    /// Load project-local specs from `.skim-tab/specs/` in CWD.
+    pub project_specs: bool,
+}
+
+impl Default for SpecsConfig {
+    fn default() -> Self {
+        Self {
+            enable: true,
+            dirs: vec!["~/.config/skim-tab/specs".to_string()],
+            project_specs: true,
         }
     }
 }
@@ -347,6 +412,9 @@ mod tests {
         assert!(cfg.completion.enrichment.k8s_live);
         assert!(cfg.completion.picker.cycle);
         assert!(cfg.completion.picker.no_sort);
+        assert_eq!(cfg.completion.picker.min_candidates, 2);
+        assert!(!cfg.completion.picker.multi_select);
+        assert!(cfg.completion.picker.show_group_header);
     }
 
     #[test]
@@ -400,6 +468,10 @@ completion:
         // Unset fields preserve defaults
         assert!(cfg.completion.dir_handling.skip_trailing_space);
         assert!(cfg.completion.enrichment.lscolors);
+        // New picker fields preserve defaults when unset
+        assert_eq!(cfg.completion.picker.min_candidates, 2);
+        assert!(!cfg.completion.picker.multi_select);
+        assert!(cfg.completion.picker.show_group_header);
     }
 
     #[test]
@@ -423,5 +495,24 @@ completion:
         assert!(cfg.completion.direct.k8s_enrichment);
         assert!(cfg.completion.single_auto_select);
         assert!(cfg.completion.preview.enable);
+    }
+
+    #[test]
+    fn deserialize_picker_new_fields() {
+        let yaml = r#"
+completion:
+  picker:
+    min_candidates: 5
+    multi_select: true
+    show_group_header: false
+"#;
+        let cfg: Config = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(cfg.completion.picker.min_candidates, 5);
+        assert!(cfg.completion.picker.multi_select);
+        assert!(!cfg.completion.picker.show_group_header);
+        // Other picker defaults preserved
+        assert!(cfg.completion.picker.cycle);
+        assert!(cfg.completion.picker.no_sort);
+        assert_eq!(cfg.completion.picker.height, "40%");
     }
 }

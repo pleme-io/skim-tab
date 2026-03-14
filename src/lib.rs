@@ -7,9 +7,12 @@
 
 pub mod complete;
 pub mod config;
+pub mod context;
 pub mod descent;
+pub mod history_db;
 pub mod k8s;
 pub mod preview;
+pub mod specs;
 
 use skim::prelude::SkimOptionsBuilder;
 use skim::tui::options::TuiLayout;
