@@ -95,6 +95,29 @@ pub struct Selection {
     pub args: String,
 }
 
+// ── Directory detection ─────────────────────────────────────────────
+
+/// Check if a file candidate represents a directory.
+/// Uses the realdir + word path to stat the filesystem.
+fn is_directory_candidate(c: &Candidate) -> bool {
+    let path = if c.realdir.is_empty() {
+        c.word.clone()
+    } else {
+        format!("{}{}", c.realdir, c.word)
+    };
+    // Expand ~ to home dir
+    let expanded = if path.starts_with('~') {
+        if let Ok(home) = std::env::var("HOME") {
+            path.replacen('~', &home, 1)
+        } else {
+            path
+        }
+    } else {
+        path
+    };
+    std::path::Path::new(&expanded).is_dir()
+}
+
 // ── Compcap parser ──────────────────────────────────────────────────
 
 /// Parse compcap format from raw bytes.
@@ -636,7 +659,15 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
     }
 
     if req.candidates.len() == 1 {
-        print_response("select", &[req.candidates[0].to_selection()], output_mode);
+        let c = &req.candidates[0];
+        // Directories: signal "continue" so the widget re-triggers completion
+        // to descend into the directory instead of finalizing with a trailing space.
+        let action = if c.is_file && is_directory_candidate(c) {
+            "continue"
+        } else {
+            "select"
+        };
+        print_response(action, &[c.to_selection()], output_mode);
         return;
     }
 
@@ -811,7 +842,22 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         })
         .collect();
 
-    let action = if selections.is_empty() { "abort" } else { "select" };
+    let action = if selections.is_empty() {
+        "abort"
+    } else if selections.len() == 1 {
+        // Check if the single selection is a directory — signal continuation
+        let sel_text = selected_texts.first().map(String::as_str).unwrap_or("");
+        let match_text = crate::strip_ansi(sel_text);
+        let match_text = match_text.split(" -- ").next().unwrap_or(&match_text);
+        let is_dir = req.candidates.iter().any(|c| {
+            (c.display_text() == match_text || c.display_text() == sel_text)
+                && c.is_file
+                && is_directory_candidate(c)
+        });
+        if is_dir { "continue" } else { "select" }
+    } else {
+        "select"
+    };
     print_response(action, &selections, output_mode);
 }
 
