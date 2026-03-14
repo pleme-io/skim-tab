@@ -4,17 +4,34 @@
 //! Env override: `SKIM_TAB_CONFIG=/path/to/config.yaml`
 //! Env prefix:   `SKIM_TAB_` (e.g. `SKIM_TAB_COMPLETION__MODE=hybrid`)
 //!
-//! # Completion modes
+//! # Feature flags
 //!
-//! - **direct** (default): Polls live sources (kubectl, history, fs) on each
-//!   completion. This is the current behavior — zero external dependencies.
+//! All new features are gated behind config flags, defaulting to off.
+//! Enable them individually as they mature:
 //!
-//! - **service**: Completes exclusively from a gRPC indexing service. If the
-//!   service is unavailable, completions are empty (no fallback). Use when
-//!   the service is guaranteed to be running.
-//!
-//! - **hybrid**: Tries the gRPC service first; falls back to direct polling
-//!   if the service is unreachable or times out. Best of both worlds.
+//! ```yaml
+//! completion:
+//!   mode: direct
+//!   in_picker_descent: false       # in-picker readdir loop (vs tab-dance)
+//!   single_auto_select: true       # auto-select when 1 candidate (skip skim)
+//!   preview:
+//!     enable: true                 # show preview pane
+//!     directories: true            # preview dir contents (eza/ls)
+//!     files: true                  # preview file contents (bat/cat)
+//!     max_lines: 20                # preview line limit
+//!   picker:
+//!     height: "40%"                # skim picker height
+//!     cycle: true                  # wrap around at top/bottom
+//!     sort: false                  # preserve completion order (no re-sort)
+//!     group_colors: true           # colorize completion groups differently
+//!   dir_handling:
+//!     append_slash: true           # append / to directory words
+//!     skip_trailing_space: true    # no space after dirs (enables tab-dance)
+//!   enrichment:
+//!     lscolors: true               # colorize file candidates via LS_COLORS
+//!     descriptions: true           # add command/subcommand descriptions
+//!     k8s_live: true               # live kubectl resource counts
+//! ```
 
 use serde::{Deserialize, Serialize};
 use shikumi::{ConfigDiscovery, Format, ProviderChain};
@@ -38,7 +55,7 @@ impl Default for Config {
 
 // ── Completion config ───────────────────────────────────────────────
 
-/// Controls how completion candidates are sourced and enriched.
+/// Controls how completion candidates are sourced, displayed, and applied.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct CompletionConfig {
@@ -51,12 +68,26 @@ pub struct CompletionConfig {
     /// Direct-mode settings (kubectl enrichment, etc.).
     pub direct: DirectConfig,
 
-    /// In-picker directory descent: when true, selecting a directory in the
-    /// skim picker triggers an in-process readdir + new skim session, letting
-    /// you navigate a directory tree without returning to zsh between levels.
-    /// When false (default), directories are returned to zsh with a trailing /
-    /// and the user tabs again for the next level.
+    /// In-picker directory descent: selecting a directory loops in-process
+    /// with readdir + new skim session. When false (default), directories
+    /// return to zsh with trailing / for the tab-dance pattern.
     pub in_picker_descent: bool,
+
+    /// Auto-select when exactly one candidate matches (skip skim picker).
+    /// When false, always show the picker even for single matches.
+    pub single_auto_select: bool,
+
+    /// Preview pane configuration.
+    pub preview: PreviewConfig,
+
+    /// Skim picker appearance and behavior.
+    pub picker: PickerConfig,
+
+    /// Directory handling in selections.
+    pub dir_handling: DirHandlingConfig,
+
+    /// Candidate enrichment (colors, descriptions, live data).
+    pub enrichment: EnrichmentConfig,
 }
 
 impl Default for CompletionConfig {
@@ -66,6 +97,11 @@ impl Default for CompletionConfig {
             service: ServiceConfig::default(),
             direct: DirectConfig::default(),
             in_picker_descent: false,
+            single_auto_select: true,
+            preview: PreviewConfig::default(),
+            picker: PickerConfig::default(),
+            dir_handling: DirHandlingConfig::default(),
+            enrichment: EnrichmentConfig::default(),
         }
     }
 }
@@ -96,6 +132,118 @@ impl CompletionMode {
     }
 }
 
+// ── Preview config ──────────────────────────────────────────────────
+
+/// Preview pane for completion candidates.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PreviewConfig {
+    /// Enable preview pane in the skim picker.
+    pub enable: bool,
+
+    /// Preview directory contents (via eza or ls).
+    pub directories: bool,
+
+    /// Preview file contents (via bat or cat).
+    pub files: bool,
+
+    /// Maximum lines to show in preview.
+    pub max_lines: usize,
+
+    /// Preview window layout (e.g., "right:50%:wrap").
+    pub layout: String,
+}
+
+impl Default for PreviewConfig {
+    fn default() -> Self {
+        Self {
+            enable: true,
+            directories: true,
+            files: true,
+            max_lines: 20,
+            layout: "right:50%:wrap".to_string(),
+        }
+    }
+}
+
+// ── Picker config ───────────────────────────────────────────────────
+
+/// Skim picker appearance and behavior.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PickerConfig {
+    /// Picker height (e.g., "40%", "20", "~50%").
+    pub height: String,
+
+    /// Wrap around at top/bottom of candidate list.
+    pub cycle: bool,
+
+    /// Preserve zsh completion order (no re-sorting by skim).
+    pub no_sort: bool,
+
+    /// Colorize completion groups with different accents.
+    pub group_colors: bool,
+}
+
+impl Default for PickerConfig {
+    fn default() -> Self {
+        Self {
+            height: "40%".to_string(),
+            cycle: true,
+            no_sort: true,
+            group_colors: true,
+        }
+    }
+}
+
+// ── Directory handling config ───────────────────────────────────────
+
+/// Controls how directory selections are handled.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DirHandlingConfig {
+    /// Append `/` to directory words (enables path-aware tab-dance).
+    pub append_slash: bool,
+
+    /// Skip trailing space for directories (cursor stays after `/`).
+    pub skip_trailing_space: bool,
+}
+
+impl Default for DirHandlingConfig {
+    fn default() -> Self {
+        Self {
+            append_slash: true,
+            skip_trailing_space: true,
+        }
+    }
+}
+
+// ── Enrichment config ───────────────────────────────────────────────
+
+/// Controls candidate enrichment (colors, descriptions, live data).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct EnrichmentConfig {
+    /// Colorize file candidates via LS_COLORS / lscolors.
+    pub lscolors: bool,
+
+    /// Add command/subcommand descriptions from the built-in registry.
+    pub descriptions: bool,
+
+    /// Enable live kubectl resource counts for K8s completions.
+    pub k8s_live: bool,
+}
+
+impl Default for EnrichmentConfig {
+    fn default() -> Self {
+        Self {
+            lscolors: true,
+            descriptions: true,
+            k8s_live: true,
+        }
+    }
+}
+
 // ── Service config ──────────────────────────────────────────────────
 
 /// gRPC completion service connection settings.
@@ -105,8 +253,7 @@ pub struct ServiceConfig {
     /// gRPC endpoint (e.g. `http://127.0.0.1:50051`).
     pub endpoint: String,
 
-    /// Connection timeout in milliseconds. In hybrid mode, exceeding
-    /// this timeout triggers fallback to direct polling.
+    /// Connection timeout in milliseconds.
     pub timeout_ms: u64,
 }
 
@@ -119,9 +266,10 @@ impl Default for ServiceConfig {
     }
 }
 
-// ── Direct config ───────────────────────────────────────────────────
+// ── Direct config (legacy — preserved for backward compat) ──────────
 
 /// Settings for direct (local subprocess) enrichment.
+/// Prefer `enrichment.k8s_live` for new configs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DirectConfig {
@@ -187,16 +335,18 @@ mod tests {
     }
 
     #[test]
-    fn default_service_endpoint() {
+    fn default_feature_flags() {
         let cfg = Config::default();
-        assert_eq!(cfg.completion.service.endpoint, "http://127.0.0.1:50051");
-        assert_eq!(cfg.completion.service.timeout_ms, 200);
-    }
-
-    #[test]
-    fn default_direct_k8s_enabled() {
-        let cfg = Config::default();
-        assert!(cfg.completion.direct.k8s_enrichment);
+        assert!(cfg.completion.single_auto_select);
+        assert!(!cfg.completion.in_picker_descent);
+        assert!(cfg.completion.preview.enable);
+        assert!(cfg.completion.dir_handling.append_slash);
+        assert!(cfg.completion.dir_handling.skip_trailing_space);
+        assert!(cfg.completion.enrichment.lscolors);
+        assert!(cfg.completion.enrichment.descriptions);
+        assert!(cfg.completion.enrichment.k8s_live);
+        assert!(cfg.completion.picker.cycle);
+        assert!(cfg.completion.picker.no_sort);
     }
 
     #[test]
@@ -222,6 +372,37 @@ completion:
     }
 
     #[test]
+    fn deserialize_feature_flags() {
+        let yaml = r#"
+completion:
+  single_auto_select: false
+  in_picker_descent: true
+  preview:
+    enable: false
+    max_lines: 50
+  picker:
+    height: "60%"
+    cycle: false
+  dir_handling:
+    append_slash: false
+  enrichment:
+    k8s_live: false
+"#;
+        let cfg: Config = serde_yaml::from_str(yaml).unwrap();
+        assert!(!cfg.completion.single_auto_select);
+        assert!(cfg.completion.in_picker_descent);
+        assert!(!cfg.completion.preview.enable);
+        assert_eq!(cfg.completion.preview.max_lines, 50);
+        assert_eq!(cfg.completion.picker.height, "60%");
+        assert!(!cfg.completion.picker.cycle);
+        assert!(!cfg.completion.dir_handling.append_slash);
+        assert!(!cfg.completion.enrichment.k8s_live);
+        // Unset fields preserve defaults
+        assert!(cfg.completion.dir_handling.skip_trailing_space);
+        assert!(cfg.completion.enrichment.lscolors);
+    }
+
+    #[test]
     fn deserialize_yaml_direct_disable_k8s() {
         let yaml = "completion:\n  direct:\n    k8s_enrichment: false\n";
         let cfg: Config = serde_yaml::from_str(yaml).unwrap();
@@ -238,8 +419,9 @@ completion:
     fn partial_yaml_preserves_defaults() {
         let yaml = "completion:\n  mode: hybrid\n";
         let cfg: Config = serde_yaml::from_str(yaml).unwrap();
-        // Service config should still have defaults
         assert_eq!(cfg.completion.service.endpoint, "http://127.0.0.1:50051");
         assert!(cfg.completion.direct.k8s_enrichment);
+        assert!(cfg.completion.single_auto_select);
+        assert!(cfg.completion.preview.enable);
     }
 }

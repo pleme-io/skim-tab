@@ -64,7 +64,13 @@ impl Candidate {
         if self.display.is_empty() { &self.word } else { &self.display }
     }
 
+    /// Build a selection with default config (append_slash=true).
     fn to_selection(&self) -> Selection {
+        self.to_selection_with_config(&config::CompletionConfig::default())
+    }
+
+    /// Build a selection respecting config flags.
+    fn to_selection_with_config(&self, cfg: &config::CompletionConfig) -> Selection {
         let is_dir = self.is_file && {
             let path = if self.realdir.is_empty() {
                 self.word.clone()
@@ -80,7 +86,7 @@ impl Candidate {
             };
             std::path::Path::new(&expanded).is_dir()
         };
-        let word = if is_dir && !self.word.ends_with('/') {
+        let word = if is_dir && cfg.dir_handling.append_slash && !self.word.ends_with('/') {
             format!("{}/", self.word)
         } else {
             self.word.clone()
@@ -660,11 +666,12 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
 
     let cfg = config::load();
 
-    if req.candidates.len() == 1 {
+    // Single candidate: auto-select or show picker based on config
+    if req.candidates.len() == 1 && cfg.completion.single_auto_select {
         let c = &req.candidates[0];
-        let sel = c.to_selection();
+        let sel = c.to_selection_with_config(&cfg.completion);
 
-        // Optional in-picker descent: loop inside skim-tab's process
+        // Optional in-picker descent
         if cfg.completion.in_picker_descent && sel.is_dir {
             let final_sel = crate::descent::run_descent(c, &sel, &req.command, matches!(output_mode, OutputMode::Eval));
             print_response("select", &[final_sel], output_mode);
@@ -674,8 +681,13 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         print_response("select", &[sel], output_mode);
         return;
     }
+
     let mode = cfg.completion.mode;
-    let ls_colors = LsColors::from_env().unwrap_or_default();
+    let ls_colors = if cfg.completion.enrichment.lscolors {
+        LsColors::from_env().unwrap_or_default()
+    } else {
+        LsColors::default()
+    };
     let base_cmd = completion_base_cmd(&req.command, &req.buffer);
     let is_k8s = tool_icon(&base_cmd).is_some();
 
@@ -840,7 +852,7 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
             req.candidates
                 .iter()
                 .find(|c| c.display_text() == plain || c.display_text() == match_text)
-                .map(Candidate::to_selection)
+                .map(|c| c.to_selection_with_config(&cfg.completion))
         })
         .collect();
 
