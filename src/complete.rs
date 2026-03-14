@@ -65,6 +65,21 @@ impl Candidate {
     }
 
     fn to_selection(&self) -> Selection {
+        let is_dir = self.is_file && {
+            let path = if self.realdir.is_empty() {
+                self.word.clone()
+            } else {
+                format!("{}{}", self.realdir, self.word)
+            };
+            let expanded = if path.starts_with('~') {
+                std::env::var("HOME")
+                    .map(|h| path.replacen('~', &h, 1))
+                    .unwrap_or(path)
+            } else {
+                path
+            };
+            std::path::Path::new(&expanded).is_dir()
+        };
         Selection {
             word: self.word.clone(),
             prefix: self.prefix.clone(),
@@ -72,6 +87,7 @@ impl Candidate {
             iprefix: self.iprefix.clone(),
             isuffix: self.isuffix.clone(),
             args: self.args.clone(),
+            is_dir,
         }
     }
 }
@@ -93,6 +109,8 @@ pub struct Selection {
     pub iprefix: String,
     pub isuffix: String,
     pub args: String,
+    /// True when the selected candidate is a directory (Rust stats the path).
+    pub is_dir: bool,
 }
 
 // ── Compcap parser ──────────────────────────────────────────────────
@@ -606,8 +624,9 @@ fn print_response(action: &str, selections: &[Selection], mode: OutputMode) {
             println!("{action}");
             for s in selections {
                 println!(
-                    "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
-                    s.word, s.prefix, s.suffix, s.iprefix, s.isuffix, s.args
+                    "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
+                    s.word, s.prefix, s.suffix, s.iprefix, s.isuffix, s.args,
+                    if s.is_dir { "d" } else { "" }
                 );
             }
         }
