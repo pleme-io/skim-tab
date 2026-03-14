@@ -112,27 +112,26 @@ fn detect_preview_type(command: &str, buffer: &str, word: &str, realdir: &str) -
         return PreviewType::Process(word.to_string());
     }
 
-    // Git command previews
-    if command.starts_with("git-checkout")
-        || command.starts_with("git-switch")
-        || command.starts_with("git-merge")
-        || command.starts_with("git-rebase")
-    {
-        // If the candidate looks like a branch name (not a file path)
-        if !word.contains('/') || !Path::new(word).exists() {
-            return PreviewType::GitBranch(word.to_string());
+    // Git command previews — handle both curcontext format (git-checkout)
+    // and base_cmd format (git with sub(0) = checkout)
+    let git_sub = if ctx.base_cmd == "git" {
+        ctx.sub(0)
+    } else if command.starts_with("git-") {
+        &command[4..]
+    } else {
+        ""
+    };
+
+    match git_sub {
+        "checkout" | "switch" | "merge" | "rebase" | "log" => {
+            if !word.contains('/') || !Path::new(word).exists() {
+                return PreviewType::GitBranch(word.to_string());
+            }
         }
-    }
-
-    if command.starts_with("git-add")
-        || command.starts_with("git-diff")
-        || command.starts_with("git-restore")
-    {
-        return PreviewType::GitFile(word.to_string());
-    }
-
-    if command.starts_with("git-log") {
-        return PreviewType::GitBranch(word.to_string());
+        "add" | "diff" | "restore" | "reset" | "stash" => {
+            return PreviewType::GitFile(word.to_string());
+        }
+        _ => {}
     }
 
     // Resolve filesystem path
@@ -186,15 +185,33 @@ pub fn preview(word: &str, command: &str, buffer: &str, realdir: &str) -> String
         PreviewType::GitBranch(name) => preview_git_branch(&name),
         PreviewType::GitFile(file) => preview_git_diff(&file, DEFAULT_MAX_LINES),
         PreviewType::Process(pid) => preview_proc(&pid),
-        PreviewType::K8sResource { .. } => {
-            // Already handled above; unreachable in practice
-            String::new()
-        }
+        PreviewType::K8sResource { .. } => String::new(), // handled above
         PreviewType::Generic(text) => {
-            match command {
+            // Context-aware generic preview: try subcommand help for known tools,
+            // then path-based preview, then command help.
+            match ctx.base_cmd {
                 "cd" | "pushd" | "z" => preview_dir(&path, DEFAULT_MAX_LINES),
+                // Tools with subcommands: show `tool subcmd --help`
+                "git" if !text.starts_with('-') && ctx.subcmds.is_empty() => {
+                    preview_subcommand("git", &text)
+                }
+                "cargo" if ctx.subcmds.is_empty() => preview_subcommand("cargo", &text),
+                "docker" | "podman" if ctx.subcmds.is_empty() => {
+                    preview_subcommand(ctx.base_cmd, &text)
+                }
+                "nix" if ctx.subcmds.is_empty() => preview_subcommand("nix", &text),
+                "npm" | "pnpm" | "yarn" if ctx.subcmds.is_empty() => {
+                    preview_subcommand(ctx.base_cmd, &text)
+                }
+                "terraform" | "tofu" if ctx.subcmds.is_empty() => {
+                    preview_subcommand(ctx.base_cmd, &text)
+                }
+                "rustup" if ctx.subcmds.is_empty() => preview_subcommand("rustup", &text),
+                "brew" if ctx.subcmds.is_empty() => preview_subcommand("brew", &text),
+                "systemctl" if ctx.subcmds.is_empty() => preview_subcommand("systemctl", &text),
+                "make" | "just" => try_path_then_command(&path, &text, DEFAULT_MAX_LINES),
                 "" => try_path_then_command(&path, &text, DEFAULT_MAX_LINES),
-                _ => preview_default(&path, &text, command, DEFAULT_MAX_LINES),
+                _ => preview_default(&path, &text, ctx.base_cmd, DEFAULT_MAX_LINES),
             }
         }
     }
