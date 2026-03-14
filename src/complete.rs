@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use skim::prelude::*;
 use std::collections::HashMap;
 use std::io::{self, Read as _};
+use std::path::Path;
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -627,6 +628,126 @@ fn completion_base_cmd(command: &str, buffer: &str) -> String {
         .to_string()
 }
 
+// ── Directory descent ────────────────────────────────────────────────
+
+/// Expand ~ to $HOME.
+fn expand_home(path: &str) -> String {
+    if path.starts_with('~') {
+        std::env::var("HOME")
+            .map(|h| path.replacen('~', &h, 1))
+            .unwrap_or_else(|_| path.to_string())
+    } else {
+        path.to_string()
+    }
+}
+
+/// Resolve the filesystem path for a candidate.
+fn candidate_fs_path(c: &Candidate) -> String {
+    let raw = if c.realdir.is_empty() {
+        c.word.clone()
+    } else {
+        format!("{}{}", c.realdir, c.word)
+    };
+    expand_home(&raw)
+}
+
+/// Check if a candidate is a directory on the filesystem.
+fn is_dir_candidate(c: &Candidate) -> bool {
+    c.is_file && Path::new(&candidate_fs_path(c)).is_dir()
+}
+
+/// Read a directory and build file-completion candidates.
+/// `base_dir` is the filesystem path, `prefix_path` is the accumulated
+/// user-visible path prefix (e.g., `.git/hooks/`).
+fn readdir_candidates(base_dir: &str, prefix_path: &str, dirs_only: bool) -> Vec<Candidate> {
+    let Ok(entries) = std::fs::read_dir(base_dir) else {
+        return vec![];
+    };
+    let mut candidates: Vec<Candidate> = entries
+        .filter_map(Result::ok)
+        .filter(|e| {
+            // Skip hidden files unless the prefix already starts with .
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') && !prefix_path.contains("/.") {
+                return false;
+            }
+            if dirs_only {
+                e.file_type().map(|ft| ft.is_dir()).unwrap_or(false)
+            } else {
+                true
+            }
+        })
+        .map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            Candidate {
+                word: format!("{prefix_path}{name}"),
+                display: name,
+                is_file: true,
+                realdir: String::new(),
+                ..Candidate::default()
+            }
+        })
+        .collect();
+    candidates.sort_by(|a, b| a.display.cmp(&b.display));
+    candidates
+}
+
+/// Run a skim session for directory descent. Returns the selected candidate
+/// display text, or None on abort.
+fn run_descent_picker(
+    candidates: &[Candidate],
+    path_so_far: &str,
+    ls_colors: &LsColors,
+) -> Option<String> {
+    if candidates.is_empty() {
+        return None;
+    }
+
+    let display_lines: Vec<String> = candidates
+        .iter()
+        .map(|c| {
+            let full_path = candidate_fs_path(c);
+            ls_colors
+                .style_for_path(&full_path)
+                .map(|s| s.to_nu_ansi_term_style().paint(&c.display).to_string())
+                .unwrap_or_else(|| c.display.clone())
+        })
+        .collect();
+
+    let header = if path_so_far.is_empty() {
+        "Tab: descend into directories | Enter: select | ESC: cancel".to_string()
+    } else {
+        format!("{path_so_far} | Enter: select | ESC: back")
+    };
+
+    let mut builder = base_options("");
+    builder
+        .multi(false)
+        .prompt(ICON_CD.to_string())
+        .header(header)
+        .height("40%".to_string())
+        .cycle(true)
+        .no_sort(true);
+
+    let skim_opts = builder.build().ok()?;
+    let items_text = display_lines.join("\n");
+    let reader = SkimItemReader::new(SkimItemReaderOption::default().ansi(true));
+    let items = reader.of_bufread(io::Cursor::new(items_text));
+
+    let output = Skim::run_with(skim_opts, Some(items)).ok()?;
+    if output.is_abort {
+        return None;
+    }
+
+    let selected = if output.selected_items.is_empty() {
+        output.current.as_ref().map(|c| c.output().to_string())
+    } else {
+        output.selected_items.first().map(|s| s.item.output().to_string())
+    };
+
+    selected.map(|s| crate::strip_ansi(&s))
+}
+
 // ── Completion runner ────────────────────────────────────────────────
 
 fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
@@ -636,7 +757,51 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
     }
 
     if req.candidates.len() == 1 {
-        print_response("select", &[req.candidates[0].to_selection()], output_mode);
+        let c = &req.candidates[0];
+        // Single directory candidate: enter descent loop immediately
+        if is_dir_candidate(c) {
+            let ls_colors = LsColors::from_env().unwrap_or_default();
+            let dirs_only = matches!(req.command.as_str(), "cd" | "pushd" | "z" | "rmdir");
+            let mut current_word = c.word.clone();
+            let mut current_fs = candidate_fs_path(c);
+            let sel = c.to_selection();
+
+            loop {
+                let path_display = format!("{current_word}/");
+                let sub_candidates = readdir_candidates(&current_fs, &path_display, dirs_only);
+                if sub_candidates.is_empty() {
+                    break;
+                }
+                match run_descent_picker(&sub_candidates, &path_display, &ls_colors) {
+                    Some(selected_display) => {
+                        if let Some(sub) = sub_candidates.iter().find(|c| c.display == selected_display) {
+                            let sub_fs = candidate_fs_path(sub);
+                            if Path::new(&sub_fs).is_dir() {
+                                current_word = sub.word.clone();
+                                current_fs = sub_fs;
+                                continue;
+                            }
+                            let final_sel = Selection {
+                                word: sub.word.clone(),
+                                ..sel.clone()
+                            };
+                            print_response("select", &[final_sel], output_mode);
+                            return;
+                        }
+                        break;
+                    }
+                    None => break,
+                }
+            }
+            let final_sel = Selection {
+                word: format!("{current_word}/"),
+                ..sel
+            };
+            print_response("select", &[final_sel], output_mode);
+            return;
+        }
+
+        print_response("select", &[c.to_selection()], output_mode);
         return;
     }
 
@@ -704,6 +869,8 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
         ns_pod_counts,
         active_ns,
     };
+
+    let has_file_candidates = req.candidates.iter().any(|c| c.is_file);
 
     let display_lines: Vec<String> = req
         .candidates
@@ -810,6 +977,82 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
                 .map(Candidate::to_selection)
         })
         .collect();
+
+    // ── Directory descent: if the user selected a single directory,
+    // loop in-process — readdir + new skim session — until they pick
+    // a non-directory or abort. The accumulated path becomes the final word.
+    if selections.len() == 1 && has_file_candidates {
+        let sel = &selections[0];
+        let selected_candidate = req.candidates.iter().find(|c| c.word == sel.word);
+
+        if let Some(sc) = selected_candidate {
+            if is_dir_candidate(sc) {
+                let ls_colors = LsColors::from_env().unwrap_or_default();
+                let dirs_only = matches!(req.command.as_str(), "cd" | "pushd" | "z" | "rmdir");
+
+                // Start descent loop
+                let mut current_word = sc.word.clone();
+                let mut current_fs = candidate_fs_path(sc);
+
+                loop {
+                    let path_display = format!("{current_word}/");
+                    let sub_candidates = readdir_candidates(
+                        &current_fs,
+                        &path_display,
+                        dirs_only,
+                    );
+
+                    if sub_candidates.is_empty() {
+                        // Empty directory — accept current path as-is
+                        break;
+                    }
+
+                    match run_descent_picker(&sub_candidates, &path_display, &ls_colors) {
+                        Some(selected_display) => {
+                            // Find the matching candidate
+                            if let Some(sub) = sub_candidates.iter().find(|c| c.display == selected_display) {
+                                let sub_fs = candidate_fs_path(sub);
+                                if Path::new(&sub_fs).is_dir() {
+                                    // Directory — descend further
+                                    current_word = sub.word.clone();
+                                    current_fs = sub_fs;
+                                    continue;
+                                }
+                                // File — return the full accumulated path
+                                let final_sel = Selection {
+                                    word: sub.word.clone(),
+                                    prefix: sel.prefix.clone(),
+                                    suffix: sel.suffix.clone(),
+                                    iprefix: sel.iprefix.clone(),
+                                    isuffix: sel.isuffix.clone(),
+                                    args: sel.args.clone(),
+                                };
+                                print_response("select", &[final_sel], output_mode);
+                                return;
+                            }
+                            break; // No match found — accept current
+                        }
+                        None => {
+                            // Abort during descent — accept the directory we're in
+                            break;
+                        }
+                    }
+                }
+
+                // User stopped descending — return the accumulated directory path
+                let final_sel = Selection {
+                    word: format!("{current_word}/"),
+                    prefix: sel.prefix.clone(),
+                    suffix: sel.suffix.clone(),
+                    iprefix: sel.iprefix.clone(),
+                    isuffix: sel.isuffix.clone(),
+                    args: sel.args.clone(),
+                };
+                print_response("select", &[final_sel], output_mode);
+                return;
+            }
+        }
+    }
 
     let action = if selections.is_empty() { "abort" } else { "select" };
     print_response(action, &selections, output_mode);
