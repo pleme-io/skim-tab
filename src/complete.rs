@@ -80,15 +80,8 @@ impl Candidate {
             };
             std::path::Path::new(&expanded).is_dir()
         };
-        // Directories: append / so zsh splits the path component and
-        // the next tab descends into the dir instead of re-matching it.
-        let word = if is_dir && !self.word.ends_with('/') {
-            format!("{}/", self.word)
-        } else {
-            self.word.clone()
-        };
         Selection {
-            word,
+            word: self.word.clone(),
             prefix: self.prefix.clone(),
             suffix: self.suffix.clone(),
             iprefix: self.iprefix.clone(),
@@ -662,7 +655,12 @@ fn run_completion(req: CompletionRequest, output_mode: OutputMode) {
     }
 
     if req.candidates.len() == 1 {
-        print_response("select", &[req.candidates[0].to_selection()], output_mode);
+        let sel = req.candidates[0].to_selection();
+        // Single directory: signal "native" so the zsh widget falls back
+        // to the native completion handler, which manages / suffix and
+        // IPREFIX splitting for seamless path descent.
+        let action = if sel.is_dir { "native" } else { "select" };
+        print_response(action, &[sel], output_mode);
         return;
     }
 
