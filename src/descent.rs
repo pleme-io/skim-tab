@@ -205,3 +205,142 @@ pub fn run_descent(
         ..base_sel.clone()
     }
 }
+
+// ── Tests ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expand_home_with_tilde() {
+        let expanded = expand_home("~/Documents");
+        assert!(!expanded.starts_with('~'), "tilde should be expanded");
+        assert!(expanded.ends_with("/Documents"));
+        // Should start with the HOME directory
+        let home = std::env::var("HOME").expect("HOME should be set in test env");
+        assert!(expanded.starts_with(&home));
+    }
+
+    #[test]
+    fn expand_home_without_tilde() {
+        assert_eq!(expand_home("/usr/local/bin"), "/usr/local/bin");
+        assert_eq!(expand_home("relative/path"), "relative/path");
+        assert_eq!(expand_home(""), "");
+    }
+
+    #[test]
+    fn readdir_candidates_real_dir() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        // Create some files and a subdirectory
+        std::fs::write(dir.path().join("alpha.txt"), "").unwrap();
+        std::fs::write(dir.path().join("beta.rs"), "").unwrap();
+        std::fs::create_dir(dir.path().join("gamma")).unwrap();
+
+        let candidates = readdir_candidates(dir.path().to_str().unwrap(), "", false);
+        assert_eq!(candidates.len(), 3);
+        // Candidates should be sorted by display name
+        assert_eq!(candidates[0].display, "alpha.txt");
+        assert_eq!(candidates[1].display, "beta.rs");
+        assert_eq!(candidates[2].display, "gamma");
+        // All should have is_file = true and empty realdir
+        for c in &candidates {
+            assert!(c.is_file);
+            assert!(c.realdir.is_empty());
+        }
+    }
+
+    #[test]
+    fn readdir_candidates_dirs_only() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        std::fs::write(dir.path().join("file.txt"), "").unwrap();
+        std::fs::create_dir(dir.path().join("subdir")).unwrap();
+
+        let candidates = readdir_candidates(dir.path().to_str().unwrap(), "", true);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].display, "subdir");
+    }
+
+    #[test]
+    fn readdir_candidates_with_prefix() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        std::fs::write(dir.path().join("hello"), "").unwrap();
+
+        let candidates = readdir_candidates(dir.path().to_str().unwrap(), "parent/", false);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].word, "parent/hello");
+        assert_eq!(candidates[0].display, "hello");
+    }
+
+    #[test]
+    fn readdir_candidates_nonexistent_dir() {
+        let candidates = readdir_candidates("/tmp/nonexistent-skim-tab-test-dir", "", false);
+        assert!(candidates.is_empty());
+    }
+
+    #[test]
+    fn candidate_fs_path_with_realdir() {
+        let c = Candidate {
+            word: "file.txt".into(),
+            realdir: "/some/dir/".into(),
+            ..Candidate::default()
+        };
+        assert_eq!(candidate_fs_path(&c), "/some/dir/file.txt");
+    }
+
+    #[test]
+    fn candidate_fs_path_without_realdir() {
+        let c = Candidate {
+            word: "relative/file.txt".into(),
+            ..Candidate::default()
+        };
+        assert_eq!(candidate_fs_path(&c), "relative/file.txt");
+    }
+
+    #[test]
+    fn candidate_fs_path_with_tilde() {
+        let c = Candidate {
+            word: "~/docs/file.txt".into(),
+            ..Candidate::default()
+        };
+        let result = candidate_fs_path(&c);
+        assert!(!result.starts_with('~'));
+        assert!(result.ends_with("/docs/file.txt"));
+    }
+
+    #[test]
+    fn is_dir_candidate_real_directory() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let c = Candidate {
+            word: dir.path().to_str().unwrap().into(),
+            is_file: true,
+            ..Candidate::default()
+        };
+        assert!(is_dir_candidate(&c));
+    }
+
+    #[test]
+    fn is_dir_candidate_not_file() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let c = Candidate {
+            word: dir.path().to_str().unwrap().into(),
+            is_file: false,
+            ..Candidate::default()
+        };
+        // is_file must be true for is_dir_candidate to return true
+        assert!(!is_dir_candidate(&c));
+    }
+
+    #[test]
+    fn is_dir_candidate_regular_file() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let file_path = dir.path().join("file.txt");
+        std::fs::write(&file_path, "").unwrap();
+        let c = Candidate {
+            word: file_path.to_str().unwrap().into(),
+            is_file: true,
+            ..Candidate::default()
+        };
+        assert!(!is_dir_candidate(&c));
+    }
+}

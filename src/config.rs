@@ -27,6 +27,8 @@
 //!     min_candidates: 2            # threshold to show picker (below = auto-insert all)
 //!     multi_select: false          # enable tab multi-select in picker
 //!     show_group_header: true      # show group count info in picker header
+//!     continuous_trigger: "/"      # key to descend into dirs in-picker (empty=disable)
+//!     accept_execute_key: ""       # key for select+execute (e.g. "ctrl-x", empty=disable)
 //!   dir_handling:
 //!     append_slash: true           # append / to directory words
 //!     skip_trailing_space: true    # no space after dirs (enables tab-dance)
@@ -206,6 +208,21 @@ pub struct PickerConfig {
     /// Show group count info in the skim header when candidates have groups.
     /// e.g., "3 groups: files, flags, subcommands"
     pub show_group_header: bool,
+
+    /// Trigger character for continuous directory descent inside the picker.
+    /// When non-empty (default: "/"), pressing this key on a directory
+    /// candidate immediately descends into that directory without leaving
+    /// the picker. The key is bound to skim's `accept` action so that
+    /// skim closes and skim-tab detects the trigger via `final_key`.
+    /// Set to empty string to disable.
+    pub continuous_trigger: String,
+
+    /// Key that selects AND signals immediate execution (e.g., "ctrl-x").
+    /// When the user presses this key, the selection is applied and the
+    /// zsh widget calls `zle accept-line` to execute the command immediately.
+    /// The eval output includes an "x" flag in the 8th field when triggered.
+    /// Set to empty string to disable (default).
+    pub accept_execute_key: String,
 }
 
 impl Default for PickerConfig {
@@ -218,6 +235,8 @@ impl Default for PickerConfig {
             min_candidates: 2,
             multi_select: false,
             show_group_header: true,
+            continuous_trigger: "/".to_string(),
+            accept_execute_key: String::new(),
         }
     }
 }
@@ -415,6 +434,8 @@ mod tests {
         assert_eq!(cfg.completion.picker.min_candidates, 2);
         assert!(!cfg.completion.picker.multi_select);
         assert!(cfg.completion.picker.show_group_header);
+        assert_eq!(cfg.completion.picker.continuous_trigger, "/");
+        assert!(cfg.completion.picker.accept_execute_key.is_empty());
     }
 
     #[test]
@@ -514,5 +535,24 @@ completion:
         assert!(cfg.completion.picker.cycle);
         assert!(cfg.completion.picker.no_sort);
         assert_eq!(cfg.completion.picker.height, "40%");
+        // R2a/R6 defaults preserved when not set
+        assert_eq!(cfg.completion.picker.continuous_trigger, "/");
+        assert!(cfg.completion.picker.accept_execute_key.is_empty());
+    }
+
+    #[test]
+    fn deserialize_picker_r2a_r6_fields() {
+        let yaml = r#"
+completion:
+  picker:
+    continuous_trigger: ""
+    accept_execute_key: "ctrl-x"
+"#;
+        let cfg: Config = serde_yaml::from_str(yaml).unwrap();
+        assert!(cfg.completion.picker.continuous_trigger.is_empty());
+        assert_eq!(cfg.completion.picker.accept_execute_key, "ctrl-x");
+        // Other defaults preserved
+        assert!(cfg.completion.picker.cycle);
+        assert_eq!(cfg.completion.picker.min_candidates, 2);
     }
 }

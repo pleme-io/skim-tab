@@ -10,6 +10,7 @@ use crate::{
     ANSI_GREEN, ANSI_PURPLE, ANSI_RESET, ANSI_YELLOW, ICON_CD, ICON_K8S, ICON_POINTER,
 };
 use config::CompletionMode;
+use crossterm::event::{KeyCode, KeyModifiers};
 use lscolors::LsColors;
 use serde::{Deserialize, Serialize};
 use skim::prelude::*;
@@ -62,11 +63,6 @@ pub struct Candidate {
 impl Candidate {
     fn display_text(&self) -> &str {
         if self.display.is_empty() { &self.word } else { &self.display }
-    }
-
-    /// Build a selection with default config (append_slash=true).
-    fn to_selection(&self) -> Selection {
-        self.to_selection_with_config(&config::CompletionConfig::default())
     }
 
     /// Build a selection respecting config flags.
@@ -649,7 +645,7 @@ enum OutputMode {
     Eval,
 }
 
-fn print_response(action: &str, selections: &[Selection], mode: OutputMode) {
+fn print_response(action: &str, selections: &[Selection], mode: OutputMode, execute: bool) {
     match mode {
         OutputMode::Json => {
             let resp = CompletionResponse {
@@ -663,9 +659,11 @@ fn print_response(action: &str, selections: &[Selection], mode: OutputMode) {
             println!("{action}");
             for s in selections {
                 let dir_flag = if s.is_dir { "d" } else { "" };
+                let exec_flag = if execute { "x" } else { "" };
                 println!(
-                    "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
-                    s.word, s.prefix, s.suffix, s.iprefix, s.isuffix, s.args, dir_flag
+                    "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
+                    s.word, s.prefix, s.suffix, s.iprefix, s.isuffix, s.args, dir_flag,
+                    exec_flag
                 );
             }
         }
@@ -685,11 +683,83 @@ fn completion_base_cmd(command: &str, buffer: &str) -> String {
         .to_string()
 }
 
+// ── Key helpers (R2a / R6c) ──────────────────────────────────────────
+
+/// A parsed key: (skim bind name, crossterm KeyCode + modifiers).
+type ParsedKey = (String, (KeyCode, KeyModifiers));
+
+/// Parse a single-character trigger (e.g., "/") into a skim bind name
+/// and the corresponding crossterm KeyCode for `final_key` matching.
+/// Returns `None` if the trigger string is empty or unparseable.
+fn parse_trigger_keycode(trigger: &str) -> Option<ParsedKey> {
+    if trigger.is_empty() {
+        return None;
+    }
+    // Single character trigger — bind as the character itself
+    if trigger.len() == 1 || trigger.chars().count() == 1 {
+        let ch = trigger.chars().next()?;
+        Some((ch.to_string(), (KeyCode::Char(ch), KeyModifiers::NONE)))
+    } else {
+        // Multi-char triggers like "ctrl-/" are handled by the general parser
+        parse_accept_execute_key(trigger)
+    }
+}
+
+/// Parse a key specification (e.g., "ctrl-x", "ctrl-/", "alt-a") into a
+/// skim bind name and the corresponding crossterm KeyCode + modifiers.
+/// Returns `None` if the key string is empty.
+fn parse_accept_execute_key(key_spec: &str) -> Option<ParsedKey> {
+    if key_spec.is_empty() {
+        return None;
+    }
+    let lower = key_spec.to_lowercase();
+
+    // ctrl-<char> patterns
+    if let Some(ch_str) = lower.strip_prefix("ctrl-") {
+        if ch_str.len() == 1 || ch_str.chars().count() == 1 {
+            let ch = ch_str.chars().next()?;
+            return Some((
+                format!("ctrl-{ch}"),
+                (KeyCode::Char(ch), KeyModifiers::CONTROL),
+            ));
+        }
+    }
+
+    // alt-<char> patterns
+    if let Some(ch_str) = lower.strip_prefix("alt-") {
+        if ch_str.len() == 1 || ch_str.chars().count() == 1 {
+            let ch = ch_str.chars().next()?;
+            return Some((
+                format!("alt-{ch}"),
+                (KeyCode::Char(ch), KeyModifiers::ALT),
+            ));
+        }
+    }
+
+    // Bare single character
+    if lower.len() == 1 || lower.chars().count() == 1 {
+        let ch = lower.chars().next()?;
+        return Some((ch.to_string(), (KeyCode::Char(ch), KeyModifiers::NONE)));
+    }
+
+    None
+}
+
+/// Check if a crossterm `KeyEvent` matches a parsed (KeyCode, KeyModifiers) pair.
+fn matches_key(
+    event: &crossterm::event::KeyEvent,
+    expected: &(KeyCode, KeyModifiers),
+) -> bool {
+    // Compare code and check that the expected modifiers are present
+    // (crossterm may add extra modifiers like SHIFT for uppercase).
+    event.code == expected.0 && event.modifiers.contains(expected.1)
+}
+
 // ── Completion runner ────────────────────────────────────────────────
 
 fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     if req.candidates.is_empty() {
-        print_response("abort", &[], output_mode);
+        print_response("abort", &[], output_mode, false);
         return;
     }
 
@@ -708,11 +778,11 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         // Optional in-picker descent
         if cfg.completion.in_picker_descent && sel.is_dir {
             let final_sel = crate::descent::run_descent(c, &sel, &req.command, matches!(output_mode, OutputMode::Eval));
-            print_response("select", &[final_sel], output_mode);
+            print_response("select", &[final_sel], output_mode, false);
             return;
         }
 
-        print_response("select", &[sel], output_mode);
+        print_response("select", &[sel], output_mode, false);
         return;
     }
 
@@ -725,7 +795,7 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
             .iter()
             .map(|c| c.to_selection_with_config(&cfg.completion))
             .collect();
-        print_response("select", &selections, output_mode);
+        print_response("select", &selections, output_mode, false);
         return;
     }
 
@@ -847,6 +917,31 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         .cycle(cfg.completion.picker.cycle)
         .no_sort(cfg.completion.picker.no_sort);
 
+    // ── R2a: bind continuous trigger key to accept ────────────────
+    // When the user types the trigger character (default "/") in the
+    // picker, skim accepts the current selection. We detect this via
+    // `output.final_key` after skim returns.
+    let trigger_key = &cfg.completion.picker.continuous_trigger;
+    let trigger_keycode = parse_trigger_keycode(trigger_key);
+
+    // ── R6c: bind accept-execute key to accept ───────────────────
+    let exec_key = &cfg.completion.picker.accept_execute_key;
+    let exec_keycode = parse_accept_execute_key(exec_key);
+
+    // Build extra binds for trigger and execute keys, merged with
+    // the standard binds (skim's bind setter replaces, doesn't append).
+    let mut all_binds: Vec<String> = crate::STANDARD_BINDS
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect();
+    if let Some((bind_name, _)) = &trigger_keycode {
+        all_binds.push(format!("{bind_name}:accept"));
+    }
+    if let Some((bind_name, _)) = &exec_keycode {
+        all_binds.push(format!("{bind_name}:accept"));
+    }
+    builder.bind(all_binds);
+
     // Group switching header (R2b): show group count info when candidates have groups
     let mut header_parts: Vec<String> = Vec::new();
 
@@ -922,9 +1017,17 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     let _ = std::fs::remove_file(&manifest_path);
 
     if output.is_abort {
-        print_response("abort", &[], output_mode);
+        print_response("abort", &[], output_mode, false);
         return;
     }
+
+    // ── Detect which key triggered accept ────────────────────────
+    let was_trigger = trigger_keycode
+        .as_ref()
+        .is_some_and(|(_, kc)| matches_key(&output.final_key, kc));
+    let was_execute = exec_keycode
+        .as_ref()
+        .is_some_and(|(_, kc)| matches_key(&output.final_key, kc));
 
     let selected_texts: Vec<String> = if output.selected_items.is_empty() {
         output
@@ -954,7 +1057,27 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         })
         .collect();
 
+    // ── R2a: continuous trigger — descend into directory ──────────
+    // If the trigger key (e.g., "/") was pressed and the selection is
+    // a single directory, enter the descent loop immediately.
+    if was_trigger && selections.len() == 1 && selections[0].is_dir {
+        if let Some(sc) = req.candidates.iter().find(|c| {
+            let sel_word = &selections[0].word;
+            c.word == *sel_word || format!("{}/", c.word) == *sel_word
+        }) {
+            let final_sel = crate::descent::run_descent(
+                sc,
+                &selections[0],
+                &req.command,
+                matches!(output_mode, OutputMode::Eval),
+            );
+            print_response("select", &[final_sel], output_mode, false);
+            return;
+        }
+    }
+
     // Optional in-picker descent for single directory selection from multi-candidate
+    // (legacy behavior: descend on any dir select when in_picker_descent is enabled)
     if cfg.completion.in_picker_descent && selections.len() == 1 && selections[0].is_dir {
         if let Some(sc) = req.candidates.iter().find(|c| {
             let sel_word = &selections[0].word;
@@ -962,7 +1085,7 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
             c.word == *sel_word || format!("{}/", c.word) == *sel_word
         }) {
             let final_sel = crate::descent::run_descent(sc, &selections[0], &req.command, matches!(output_mode, OutputMode::Eval));
-            print_response("select", &[final_sel], output_mode);
+            print_response("select", &[final_sel], output_mode, false);
             return;
         }
     }
@@ -980,7 +1103,7 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     }
 
     let action = if selections.is_empty() { "abort" } else { "select" };
-    print_response(action, &selections, output_mode);
+    print_response(action, &selections, output_mode, was_execute);
 }
 
 // ── CLI arg helper ───────────────────────────────────────────────────
@@ -1004,7 +1127,7 @@ pub fn run() {
         Ok(r) => r,
         Err(e) => {
             eprintln!("skim-tab: invalid JSON: {e}");
-            print_response("abort", &[], OutputMode::Json);
+            print_response("abort", &[], OutputMode::Json, false);
             std::process::exit(1);
         }
     };
@@ -1157,7 +1280,8 @@ mod tests {
             args: "-Q\x01-f".into(),
             ..Default::default()
         };
-        let sel = c.to_selection();
+        let cfg = config::CompletionConfig::default();
+        let sel = c.to_selection_with_config(&cfg);
         assert_eq!(sel.word, "pod-1");
         assert_eq!(sel.prefix, "p");
         assert_eq!(sel.iprefix, "i");
@@ -1478,5 +1602,118 @@ mod tests {
         };
         let desc = build_description("default", "kubectl", &k8s);
         assert_eq!(desc, Some("active, 12 pods".to_string()));
+    }
+
+    // ── R2a: trigger key parsing ──────────────────────────────────
+
+    #[test]
+    fn parse_trigger_keycode_slash() {
+        let result = parse_trigger_keycode("/");
+        assert!(result.is_some());
+        let (bind_name, (code, mods)) = result.unwrap();
+        assert_eq!(bind_name, "/");
+        assert_eq!(code, KeyCode::Char('/'));
+        assert_eq!(mods, KeyModifiers::NONE);
+    }
+
+    #[test]
+    fn parse_trigger_keycode_empty() {
+        assert!(parse_trigger_keycode("").is_none());
+    }
+
+    #[test]
+    fn parse_trigger_keycode_ctrl_slash() {
+        let result = parse_trigger_keycode("ctrl-/");
+        assert!(result.is_some());
+        let (bind_name, (code, mods)) = result.unwrap();
+        assert_eq!(bind_name, "ctrl-/");
+        assert_eq!(code, KeyCode::Char('/'));
+        assert_eq!(mods, KeyModifiers::CONTROL);
+    }
+
+    // ── R6c: accept-execute key parsing ───────────────────────────
+
+    #[test]
+    fn parse_accept_execute_key_ctrl_x() {
+        let result = parse_accept_execute_key("ctrl-x");
+        assert!(result.is_some());
+        let (bind_name, (code, mods)) = result.unwrap();
+        assert_eq!(bind_name, "ctrl-x");
+        assert_eq!(code, KeyCode::Char('x'));
+        assert_eq!(mods, KeyModifiers::CONTROL);
+    }
+
+    #[test]
+    fn parse_accept_execute_key_alt_enter() {
+        let result = parse_accept_execute_key("alt-a");
+        assert!(result.is_some());
+        let (bind_name, (code, mods)) = result.unwrap();
+        assert_eq!(bind_name, "alt-a");
+        assert_eq!(code, KeyCode::Char('a'));
+        assert_eq!(mods, KeyModifiers::ALT);
+    }
+
+    #[test]
+    fn parse_accept_execute_key_empty() {
+        assert!(parse_accept_execute_key("").is_none());
+    }
+
+    #[test]
+    fn parse_accept_execute_key_bare_char() {
+        let result = parse_accept_execute_key("x");
+        assert!(result.is_some());
+        let (bind_name, (code, mods)) = result.unwrap();
+        assert_eq!(bind_name, "x");
+        assert_eq!(code, KeyCode::Char('x'));
+        assert_eq!(mods, KeyModifiers::NONE);
+    }
+
+    // ── matches_key ───────────────────────────────────────────────
+
+    #[test]
+    fn matches_key_exact() {
+        let event = crossterm::event::KeyEvent::new(
+            KeyCode::Char('/'),
+            KeyModifiers::NONE,
+        );
+        assert!(matches_key(&event, &(KeyCode::Char('/'), KeyModifiers::NONE)));
+    }
+
+    #[test]
+    fn matches_key_ctrl() {
+        let event = crossterm::event::KeyEvent::new(
+            KeyCode::Char('x'),
+            KeyModifiers::CONTROL,
+        );
+        assert!(matches_key(&event, &(KeyCode::Char('x'), KeyModifiers::CONTROL)));
+    }
+
+    #[test]
+    fn matches_key_wrong_char() {
+        let event = crossterm::event::KeyEvent::new(
+            KeyCode::Char('a'),
+            KeyModifiers::NONE,
+        );
+        assert!(!matches_key(&event, &(KeyCode::Char('/'), KeyModifiers::NONE)));
+    }
+
+    #[test]
+    fn matches_key_wrong_modifier() {
+        let event = crossterm::event::KeyEvent::new(
+            KeyCode::Char('x'),
+            KeyModifiers::NONE,
+        );
+        assert!(!matches_key(&event, &(KeyCode::Char('x'), KeyModifiers::CONTROL)));
+    }
+
+    #[test]
+    fn matches_key_superset_modifiers_ok() {
+        // crossterm may report CONTROL|SHIFT when the user hits ctrl-X
+        // (uppercase). Our matcher checks that CONTROL is present.
+        let event = crossterm::event::KeyEvent::new(
+            KeyCode::Char('x'),
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+        );
+        assert!(matches_key(&event, &(KeyCode::Char('x'), KeyModifiers::CONTROL)));
     }
 }

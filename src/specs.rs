@@ -61,6 +61,10 @@ pub struct SpecRegistry {
 const BUILTIN_SPECS: &[(&str, &str)] = &[
     ("docker.yaml", include_str!("../specs/docker.yaml")),
     ("nix.yaml", include_str!("../specs/nix.yaml")),
+    ("cargo.yaml", include_str!("../specs/cargo.yaml")),
+    ("git.yaml", include_str!("../specs/git.yaml")),
+    ("npm.yaml", include_str!("../specs/npm.yaml")),
+    ("terraform.yaml", include_str!("../specs/terraform.yaml")),
 ];
 
 /// Global singleton registry, lazily initialized on first access.
@@ -224,7 +228,7 @@ mod tests {
     #[test]
     fn builtin_specs_load() {
         let reg = SpecRegistry::new(&default_specs_config());
-        // Should have at least the 2 built-in specs (docker + nix)
+        // Should have all built-in specs (docker, nix, cargo, git, npm, terraform)
         assert!(reg.specs.len() >= 2);
     }
 
