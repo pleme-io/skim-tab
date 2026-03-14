@@ -36,18 +36,33 @@ fn history_path() -> PathBuf {
 }
 
 /// Read history, deduplicate (most recent wins), return in reverse order.
+///
+/// Uses byte-level reading with lossy UTF-8 conversion so corrupted
+/// history entries are cleaned up rather than crashing the search.
 fn read_history() -> Result<Vec<String>> {
     let path = history_path();
     let file =
         fs::File::open(&path).with_context(|| format!("failed to open {}", path.display()))?;
-    let reader = io::BufReader::new(file);
+    let mut reader = io::BufReader::new(file);
 
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut counter: usize = 0;
     let mut continuation = String::new();
+    let mut buf = Vec::new();
 
-    for line in reader.lines() {
-        let line = line.context("failed to read history line")?;
+    loop {
+        buf.clear();
+        let bytes_read = reader
+            .read_until(b'\n', &mut buf)
+            .context("failed to read history file")?;
+        if bytes_read == 0 {
+            break;
+        }
+        if buf.last() == Some(&b'\n') {
+            buf.pop();
+        }
+        let line = String::from_utf8_lossy(&buf);
+
         if !continuation.is_empty() {
             continuation.push('\n');
             continuation.push_str(&line);
@@ -62,7 +77,7 @@ fn read_history() -> Result<Vec<String>> {
             continue;
         }
         if line.ends_with('\\') {
-            continuation = line;
+            continuation = line.into_owned();
             continue;
         }
 
