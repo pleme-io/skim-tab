@@ -80,8 +80,15 @@ impl Candidate {
             };
             std::path::Path::new(&expanded).is_dir()
         };
+        // Directories: append / so zsh splits the path component and
+        // the next tab descends into the dir instead of re-matching it.
+        let word = if is_dir && !self.word.ends_with('/') {
+            format!("{}/", self.word)
+        } else {
+            self.word.clone()
+        };
         Selection {
-            word: self.word.clone(),
+            word,
             prefix: self.prefix.clone(),
             suffix: self.suffix.clone(),
             iprefix: self.iprefix.clone(),
