@@ -55,9 +55,11 @@ pub struct SubcommandSpec {
 /// `MockDescriptionProvider` for testing.
 pub trait DescriptionProvider {
     /// Look up (glyph, description) for a word under a command.
-    fn lookup(&self, command: &str, word: &str) -> Option<(String, String)>;
+    fn lookup(&self, command: &str, word: &str) -> Option<(&str, &str)>;
     /// Get the prompt icon for a command, or None.
     fn icon(&self, command: &str) -> Option<&str>;
+    /// Check if a command is a Kubernetes-related tool.
+    fn is_k8s_command(&self, cmd: &str) -> bool;
 }
 
 // ── Registry ──────────────────────────────────────────────────────────
@@ -145,17 +147,12 @@ impl DescriptionProvider for SpecRegistry {
     ///
     /// Searches specs in reverse order so that later-loaded specs
     /// (project > user > built-in) take priority.
-    fn lookup(&self, command: &str, word: &str) -> Option<(String, String)> {
+    fn lookup(&self, command: &str, word: &str) -> Option<(&str, &str)> {
         // Search in reverse so later specs (higher priority) win.
         for spec in self.specs.iter().rev() {
             if spec.commands.iter().any(|c| c == command) {
                 if let Some(sub) = spec.subcommands.get(word) {
-                    let glyph = if sub.glyph.is_empty() {
-                        String::new()
-                    } else {
-                        sub.glyph.clone()
-                    };
-                    return Some((glyph, sub.description.clone()));
+                    return Some((&sub.glyph, &sub.description));
                 }
             }
         }
@@ -173,6 +170,17 @@ impl DescriptionProvider for SpecRegistry {
         }
         None
     }
+
+    /// Check if a command is a Kubernetes-related tool.
+    ///
+    /// Returns `true` if the command matches any spec that uses the
+    /// K8s icon ("\u{2388} ").
+    fn is_k8s_command(&self, cmd: &str) -> bool {
+        self.specs.iter().any(|s| {
+            s.commands.iter().any(|c| c == cmd)
+                && s.icon.as_deref() == Some("\u{2388} ")
+        })
+    }
 }
 
 // ── Mock provider ─────────────────────────────────────────────────────
@@ -184,6 +192,8 @@ pub struct MockDescriptionProvider {
     pub entries: HashMap<(String, String), (String, String)>,
     /// command -> icon
     pub icons: HashMap<String, String>,
+    /// Commands considered K8s-related
+    pub k8s_commands: Vec<String>,
 }
 
 #[cfg(test)]
@@ -192,20 +202,25 @@ impl MockDescriptionProvider {
         Self {
             entries: HashMap::new(),
             icons: HashMap::new(),
+            k8s_commands: Vec::new(),
         }
     }
 }
 
 #[cfg(test)]
 impl DescriptionProvider for MockDescriptionProvider {
-    fn lookup(&self, command: &str, word: &str) -> Option<(String, String)> {
+    fn lookup(&self, command: &str, word: &str) -> Option<(&str, &str)> {
         self.entries
             .get(&(command.to_string(), word.to_string()))
-            .cloned()
+            .map(|(g, d)| (g.as_str(), d.as_str()))
     }
 
     fn icon(&self, command: &str) -> Option<&str> {
         self.icons.get(command).map(String::as_str)
+    }
+
+    fn is_k8s_command(&self, cmd: &str) -> bool {
+        self.k8s_commands.iter().any(|c| c == cmd)
     }
 }
 
@@ -257,6 +272,7 @@ pub fn load_specs_from_dir(path: &Path) -> Vec<CompletionSpec> {
 // ── Helpers ───────────────────────────────────────────────────────────
 
 /// Expand `~` at the start of a path to `$HOME`.
+#[must_use]
 fn shellexpand_tilde(path: &str) -> String {
     if let Some(rest) = path.strip_prefix('~') {
         if let Ok(home) = std::env::var("HOME") {
@@ -314,6 +330,19 @@ mod tests {
         let (glyph, desc) = result.unwrap();
         assert_eq!(desc, "Build a derivation");
         assert!(!glyph.is_empty());
+    }
+
+    #[test]
+    fn is_k8s_command_via_trait() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        assert!(reg.is_k8s_command("kubectl"));
+        assert!(reg.is_k8s_command("kubecolor"));
+        assert!(reg.is_k8s_command("k"));
+        assert!(reg.is_k8s_command("helm"));
+        assert!(reg.is_k8s_command("flux"));
+        assert!(!reg.is_k8s_command("docker"));
+        assert!(!reg.is_k8s_command("aws"));
+        assert!(!reg.is_k8s_command("cd"));
     }
 
     #[test]
@@ -463,20 +492,20 @@ mod tests {
     fn lookup_kubectl_aliases() {
         let reg = SpecRegistry::new(&default_specs_config());
         // "kubectl" command
-        let result = DescriptionProvider::lookup(&reg, "kubectl", "pods");
+        let result = reg.lookup("kubectl", "pods");
         assert!(result.is_some());
         let (glyph, desc) = result.unwrap();
         assert_eq!(desc, "Pod workloads");
         assert!(!glyph.is_empty());
 
         // "k" alias
-        let result_k = DescriptionProvider::lookup(&reg, "k", "deploy");
+        let result_k = reg.lookup("k", "deploy");
         assert!(result_k.is_some());
         let (_, desc_k) = result_k.unwrap();
         assert_eq!(desc_k, "Managed replicas");
 
         // "kubecolor" alias
-        let result_kc = DescriptionProvider::lookup(&reg, "kubecolor", "get");
+        let result_kc = reg.lookup("kubecolor", "get");
         assert!(result_kc.is_some());
         let (_, desc_kc) = result_kc.unwrap();
         assert_eq!(desc_kc, "Display resources");
@@ -511,10 +540,7 @@ mod tests {
             .insert("test-cmd".to_string(), "T ".to_string());
 
         let result = DescriptionProvider::lookup(&mock, "test-cmd", "sub");
-        assert_eq!(
-            result,
-            Some(("G".to_string(), "A description".to_string()))
-        );
+        assert_eq!(result, Some(("G", "A description")));
         assert!(DescriptionProvider::lookup(&mock, "test-cmd", "missing").is_none());
 
         assert_eq!(DescriptionProvider::icon(&mock, "test-cmd"), Some("T "));

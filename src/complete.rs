@@ -314,6 +314,7 @@ fn build_description(
 /// Color description glyph prefix in purple, rest stays dim.
 /// Non-ASCII leading character (our category glyph) gets ANSI_PURPLE;
 /// ASCII-only descriptions pass through unchanged.
+#[must_use]
 fn color_description(desc: &str) -> String {
     let mut chars = desc.chars();
     match chars.next() {
@@ -326,24 +327,17 @@ fn color_description(desc: &str) -> String {
 
 // ── Description lookup ────────────────────────────────────────────────
 
-/// Check if a command is a Kubernetes-related tool.
-///
-/// This is used to gate K8s enrichment (kubectl calls, context display)
-/// and must NOT rely on icon presence — all specs now have icons.
-fn is_k8s_command(cmd: &str) -> bool {
-    matches!(cmd, "kubectl" | "kubecolor" | "k" | "helm" | "flux")
-}
-
 /// Look up a description for a candidate word.
 ///
 /// Checks the YAML spec registry (built-in + user + project specs).
 /// Results include a glyph prefix (e.g., "◇ Build an image") when available.
+#[must_use]
 fn lookup_description(word: &str, command: &str, registry: &dyn DescriptionProvider) -> Option<String> {
     let base = command.split(':').next().unwrap_or(command);
 
     if let Some((glyph, desc)) = registry.lookup(base, word) {
         let formatted = if glyph.is_empty() {
-            desc
+            desc.to_owned()
         } else {
             format!("{glyph} {desc}")
         };
@@ -356,6 +350,7 @@ fn lookup_description(word: &str, command: &str, registry: &dyn DescriptionProvi
 /// Get the prompt icon for a command, or None for the default.
 ///
 /// Normalizes trailing space: icons without a trailing space get one appended.
+#[must_use]
 fn tool_icon<'a>(command: &str, registry: &'a dyn DescriptionProvider) -> Option<String> {
     registry.icon(command).map(|icon| {
         if icon.ends_with(' ') {
@@ -382,7 +377,7 @@ fn print_response(action: &str, selections: &[Selection], mode: OutputMode, exec
                 selections: selections.to_vec(),
                 query: None,
             };
-            println!("{}", serde_json::to_string(&resp).unwrap());
+            println!("{}", serde_json::to_string(&resp).unwrap_or_else(|e| format!("{{\"error\": \"{e}\"}}")));
         }
         OutputMode::Eval => {
             println!("{action}");
@@ -404,6 +399,7 @@ fn print_response(action: &str, selections: &[Selection], mode: OutputMode, exec
 /// Extract the base command for color/description lookups.
 /// Prefers the buffer's first word (the actual command typed) over
 /// the zsh curcontext command name.
+#[must_use]
 fn completion_base_cmd(command: &str, buffer: &str) -> String {
     buffer
         .split_whitespace()
@@ -535,7 +531,7 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         LsColors::default()
     };
     let base_cmd = completion_base_cmd(&req.command, &req.buffer);
-    let is_k8s = is_k8s_command(&base_cmd);
+    let is_k8s = registry.is_k8s_command(&base_cmd);
 
     // ── Enrichment: service mode (future gRPC client) ───────────
     // When service or hybrid mode is active, we'll query the indexing
@@ -714,7 +710,7 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
             "realdir": c.realdir,
         })).collect::<Vec<_>>(),
     });
-    let _ = std::fs::write(&manifest_path, serde_json::to_string(&manifest).unwrap());
+    let _ = std::fs::write(&manifest_path, serde_json::to_string(&manifest).unwrap_or_else(|e| format!("{{\"error\": \"{e}\"}}")));
 
     builder.preview(format!(
         "skim-tab --preview {} '{{}}'",
@@ -1235,16 +1231,17 @@ mod tests {
 
     #[test]
     fn is_k8s_command_check() {
-        assert!(is_k8s_command("kubectl"));
-        assert!(is_k8s_command("kubecolor"));
-        assert!(is_k8s_command("k"));
-        assert!(is_k8s_command("helm"));
-        assert!(is_k8s_command("flux"));
-        assert!(!is_k8s_command("aws"));
-        assert!(!is_k8s_command("gcloud"));
-        assert!(!is_k8s_command("az"));
-        assert!(!is_k8s_command("docker"));
-        assert!(!is_k8s_command("cd"));
+        let reg = test_registry();
+        assert!(reg.is_k8s_command("kubectl"));
+        assert!(reg.is_k8s_command("kubecolor"));
+        assert!(reg.is_k8s_command("k"));
+        assert!(reg.is_k8s_command("helm"));
+        assert!(reg.is_k8s_command("flux"));
+        assert!(!reg.is_k8s_command("aws"));
+        assert!(!reg.is_k8s_command("gcloud"));
+        assert!(!reg.is_k8s_command("az"));
+        assert!(!reg.is_k8s_command("docker"));
+        assert!(!reg.is_k8s_command("cd"));
     }
 
     #[test]
