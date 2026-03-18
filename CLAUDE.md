@@ -4,7 +4,7 @@
 
 ```bash
 cargo build          # compile
-cargo test           # 185 tests across all binaries
+cargo test           # 184+ tests across all binaries
 cargo check          # type-check only
 ```
 
@@ -36,13 +36,15 @@ Tab pressed
 | Path | Purpose |
 |------|---------|
 | `src/main.rs` | CLI dispatch: --complete, --preview, --history, --files, etc. |
-| `src/complete.rs` | Core completion: compcap parsing, colorization, skim runner, selection. `is_k8s_command()` for explicit K8s detection |
-| `src/specs.rs` | `DescriptionProvider` trait, `SpecRegistry` (12 built-in YAML specs), `CompletionSpec` serde types |
+| `src/complete.rs` | Core completion: compcap parsing, colorization, skim runner, selection |
+| `src/specs.rs` | `DescriptionProvider` trait (with `is_k8s_command`), `SpecRegistry` (12 built-in YAML specs), `CompletionSpec` serde types |
 | `src/config.rs` | shikumi-based YAML config with feature flags |
+| `src/context.rs` | Context introspection helpers |
+| `src/history_db.rs` | `HistoryStore` trait, `HistoryDb` (SQLite), `MemHistoryStore` (test), `frecency_score()` pure fn |
 | `src/descent.rs` | In-picker directory descent (optional, gated by config) |
 | `src/history.rs` | Ctrl+R history search with lossy UTF-8 |
 | `src/preview.rs` | Preview pane rendering for candidates |
-| `src/k8s.rs` | Kubernetes enrichment (resource counts, namespace info) |
+| `src/k8s.rs` | `KubeconfigLoader`/`KubectlRunner` traits, `KubeContext`, resource counts, namespace enrichment |
 | `src/cd.rs` | Smart cd widget (zoxide integration) |
 | `src/files.rs` | Ctrl+T file finder |
 | `src/content.rs` | Ctrl+F content search |
@@ -109,7 +111,8 @@ Auto-generated specs can be produced by **completion-forge** from OpenAPI specs.
 - **Rust-first**: All intelligence (dir detection, path stat, enrichment, colorization) in Rust. Zsh is a thin wrapper.
 - **Config-gated features**: Every feature has a flag. Defaults match current behavior. New features opt-in.
 - **YAML-driven descriptions**: All command descriptions live in YAML specs (no hardcoded registries). `DescriptionProvider` trait abstracts lookup.
-- **Explicit K8s detection**: `is_k8s_command()` matches only kubectl/kubecolor/k/helm/flux — prevents aws/gcloud/az from triggering kubectl calls.
+- **Trait-based K8s detection**: `is_k8s_command()` on `DescriptionProvider` checks spec icon for K8s helm wheel — prevents aws/gcloud/az from triggering kubectl calls.
+- **Zero-copy lookups**: `DescriptionProvider::lookup()` returns `(&str, &str)` refs; `api_type_to_plural()` returns `Cow<'static, str>`.
 - **Native fallback for path descent**: When LBUFFER ends with /, bypass skim and let zsh's `_path_files` handle IPREFIX splitting. This is the only way to get correct multi-level cd descent without reimplementing zsh's path completer.
 - **compadd -Q**: Required for the fzf-tab protocol but prevents zsh from managing directory suffixes. We compensate by appending / in Rust and signaling no-space to zsh.
 
