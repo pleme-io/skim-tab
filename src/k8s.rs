@@ -4,6 +4,7 @@
 //! Shells out to kubectl only for live resource counts.
 
 use serde::Deserialize;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
@@ -72,6 +73,7 @@ impl KubeContext {
     }
 
     /// Format header string for skim display.
+    #[must_use]
     pub fn header(&self) -> String {
         use crate::{ANSI_DIM, ANSI_FROST, ANSI_GREEN, ANSI_RESET};
 
@@ -94,6 +96,7 @@ impl KubeContext {
     }
 
     /// Format prompt string with truncated context name.
+    #[must_use]
     pub fn prompt(&self) -> String {
         let name = match self.context.char_indices().nth(15) {
             Some((idx, _)) => &self.context[..idx],
@@ -118,6 +121,7 @@ fn kubeconfig_paths() -> Vec<PathBuf> {
 
 /// Count resources by type via a single `kubectl get` call.
 /// Returns a map from plural type name (e.g., "pods") to count.
+#[must_use]
 pub fn resource_counts(types: &[&str], namespace: Option<&str>) -> HashMap<String, usize> {
     if types.is_empty() {
         return HashMap::new();
@@ -144,7 +148,7 @@ pub fn resource_counts(types: &[&str], namespace: Option<&str>) -> HashMap<Strin
     for line in stdout.lines() {
         if let Some(api_type) = line.split('/').next() {
             let plural = api_type_to_plural(api_type);
-            *counts.entry(plural).or_insert(0) += 1;
+            *counts.entry(plural.into_owned()).or_insert(0) += 1;
         }
     }
     counts
@@ -152,46 +156,47 @@ pub fn resource_counts(types: &[&str], namespace: Option<&str>) -> HashMap<Strin
 
 /// Map kubectl API type prefix (from `-o name`) to the plural form
 /// used by completion candidates.
-fn api_type_to_plural(api_type: &str) -> String {
+#[must_use]
+fn api_type_to_plural(api_type: &str) -> Cow<'static, str> {
     let base = api_type.split('.').next().unwrap_or(api_type);
     match base {
-        "pod" => "pods",
-        "service" => "services",
-        "deployment" => "deployments",
-        "replicaset" => "replicasets",
-        "statefulset" => "statefulsets",
-        "daemonset" => "daemonsets",
-        "job" => "jobs",
-        "cronjob" => "cronjobs",
-        "configmap" => "configmaps",
-        "secret" => "secrets",
-        "ingress" => "ingresses",
-        "namespace" => "namespaces",
-        "node" => "nodes",
-        "persistentvolumeclaim" => "persistentvolumeclaims",
-        "persistentvolume" => "persistentvolumes",
-        "serviceaccount" => "serviceaccounts",
-        "role" => "roles",
-        "clusterrole" => "clusterroles",
-        "rolebinding" => "rolebindings",
-        "clusterrolebinding" => "clusterrolebindings",
-        "networkpolicy" => "networkpolicies",
-        "storageclass" => "storageclasses",
-        "event" => "events",
-        "endpoints" => "endpoints",
-        "horizontalpodautoscaler" => "horizontalpodautoscalers",
-        "poddisruptionbudget" => "poddisruptionbudgets",
-        "limitrange" => "limitranges",
-        "resourcequota" => "resourcequotas",
-        "customresourcedefinition" => "customresourcedefinitions",
-        other => return format!("{other}s"),
+        "pod" => Cow::Borrowed("pods"),
+        "service" => Cow::Borrowed("services"),
+        "deployment" => Cow::Borrowed("deployments"),
+        "replicaset" => Cow::Borrowed("replicasets"),
+        "statefulset" => Cow::Borrowed("statefulsets"),
+        "daemonset" => Cow::Borrowed("daemonsets"),
+        "job" => Cow::Borrowed("jobs"),
+        "cronjob" => Cow::Borrowed("cronjobs"),
+        "configmap" => Cow::Borrowed("configmaps"),
+        "secret" => Cow::Borrowed("secrets"),
+        "ingress" => Cow::Borrowed("ingresses"),
+        "namespace" => Cow::Borrowed("namespaces"),
+        "node" => Cow::Borrowed("nodes"),
+        "persistentvolumeclaim" => Cow::Borrowed("persistentvolumeclaims"),
+        "persistentvolume" => Cow::Borrowed("persistentvolumes"),
+        "serviceaccount" => Cow::Borrowed("serviceaccounts"),
+        "role" => Cow::Borrowed("roles"),
+        "clusterrole" => Cow::Borrowed("clusterroles"),
+        "rolebinding" => Cow::Borrowed("rolebindings"),
+        "clusterrolebinding" => Cow::Borrowed("clusterrolebindings"),
+        "networkpolicy" => Cow::Borrowed("networkpolicies"),
+        "storageclass" => Cow::Borrowed("storageclasses"),
+        "event" => Cow::Borrowed("events"),
+        "endpoints" => Cow::Borrowed("endpoints"),
+        "horizontalpodautoscaler" => Cow::Borrowed("horizontalpodautoscalers"),
+        "poddisruptionbudget" => Cow::Borrowed("poddisruptionbudgets"),
+        "limitrange" => Cow::Borrowed("limitranges"),
+        "resourcequota" => Cow::Borrowed("resourcequotas"),
+        "customresourcedefinition" => Cow::Borrowed("customresourcedefinitions"),
+        other => Cow::Owned(format!("{other}s")),
     }
-    .to_string()
 }
 
 // ── Namespace pod counts ─────────────────────────────────────────────
 
 /// Count pods per namespace via a single `kubectl get pods -A` call.
+#[must_use]
 pub fn namespace_pod_counts() -> HashMap<String, usize> {
     let output = Command::new("kubectl")
         .args([
