@@ -8,6 +8,38 @@ use std::path::PathBuf;
 
 use rusqlite::{params, Connection};
 
+// ── Frecency scoring ─────────────────────────────────────────────────
+
+/// Compute a single frecency contribution from one historical event.
+///
+/// The formula is: `1.0 / (1.0 + age_days)` where `age_days` is clamped
+/// to non-negative. Recent events (age near 0) contribute close to 1.0;
+/// older events decay hyperbolically.
+///
+/// For an entry with multiple occurrences, sum the per-occurrence scores.
+#[must_use]
+pub fn frecency_score(age_days: f64, _frequency: u32) -> f64 {
+    1.0 / (1.0 + age_days.max(0.0))
+}
+
+// ── HistoryStore trait ───────────────────────────────────────────────
+
+/// Abstraction over selection history storage for testability.
+pub trait HistoryStore {
+    /// Record a selection event for the given command, cwd, and word.
+    fn record(&self, command: &str, cwd: &str, word: &str) -> anyhow::Result<()>;
+
+    /// Query frecency scores for all words previously selected for the
+    /// given command + cwd combination. Returns a map of word to score.
+    fn frecency_scores(
+        &self,
+        command: &str,
+        cwd: &str,
+    ) -> anyhow::Result<HashMap<String, f64>>;
+}
+
+// ── SQLite-backed store ──────────────────────────────────────────────
+
 /// SQLite-backed selection history for frecency ranking.
 pub struct HistoryDb {
     conn: Connection,
@@ -73,7 +105,7 @@ impl HistoryDb {
 
         for row in rows {
             let (word, days_ago) = row?;
-            let contribution = 1.0 / (1.0 + days_ago.max(0.0));
+            let contribution = frecency_score(days_ago, 1);
             *scores.entry(word).or_insert(0.0) += contribution;
         }
 
@@ -102,6 +134,70 @@ impl HistoryDb {
         } else {
             PathBuf::from("/tmp/skim-tab-selections.db")
         }
+    }
+}
+
+impl HistoryStore for HistoryDb {
+    fn record(&self, command: &str, cwd: &str, word: &str) -> anyhow::Result<()> {
+        self.record(command, cwd, word)?;
+        Ok(())
+    }
+
+    fn frecency_scores(
+        &self,
+        command: &str,
+        cwd: &str,
+    ) -> anyhow::Result<HashMap<String, f64>> {
+        Ok(self.frecency_scores(command, cwd)?)
+    }
+}
+
+// ── In-memory store (test only) ─────────────────────────────────────
+
+#[cfg(test)]
+pub struct MemHistoryStore {
+    entries: std::sync::Mutex<Vec<(String, String, String, std::time::Instant)>>,
+}
+
+#[cfg(test)]
+impl MemHistoryStore {
+    pub fn new() -> Self {
+        Self {
+            entries: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+}
+
+#[cfg(test)]
+impl HistoryStore for MemHistoryStore {
+    fn record(&self, command: &str, cwd: &str, word: &str) -> anyhow::Result<()> {
+        let mut entries = self.entries.lock().unwrap();
+        entries.push((
+            command.to_string(),
+            cwd.to_string(),
+            word.to_string(),
+            std::time::Instant::now(),
+        ));
+        Ok(())
+    }
+
+    fn frecency_scores(
+        &self,
+        command: &str,
+        cwd: &str,
+    ) -> anyhow::Result<HashMap<String, f64>> {
+        let entries = self.entries.lock().unwrap();
+        let now = std::time::Instant::now();
+        let mut scores: HashMap<String, f64> = HashMap::new();
+        for (cmd, dir, word, ts) in entries.iter() {
+            if cmd == command && dir == cwd {
+                let age_secs = now.duration_since(*ts).as_secs_f64();
+                let age_days = age_secs / 86400.0;
+                let contribution = frecency_score(age_days, 1);
+                *scores.entry(word.clone()).or_insert(0.0) += contribution;
+            }
+        }
+        Ok(scores)
     }
 }
 
@@ -235,5 +331,79 @@ mod tests {
 
         let scores = db.frecency_scores("cd", "/tmp").unwrap();
         assert!(scores["new_dir"] > scores["old_dir"]);
+    }
+
+    // ── New frecency_score function tests ────────────────────────────
+
+    #[test]
+    fn frecency_score_recent_higher() {
+        let recent = frecency_score(0.1, 1);
+        let old = frecency_score(30.0, 1);
+        assert!(
+            recent > old,
+            "recent score ({recent}) should be higher than old score ({old})"
+        );
+    }
+
+    #[test]
+    fn frecency_score_zero_age() {
+        let score = frecency_score(0.0, 1);
+        assert!(
+            (score - 1.0).abs() < f64::EPSILON,
+            "score at age 0 should be 1.0, got {score}"
+        );
+    }
+
+    #[test]
+    fn frecency_score_negative_age_clamped() {
+        // Negative age should be clamped to 0, producing a score of 1.0
+        let score = frecency_score(-5.0, 1);
+        assert!(
+            (score - 1.0).abs() < f64::EPSILON,
+            "negative age should clamp to 0 => score 1.0, got {score}"
+        );
+    }
+
+    // ── MemHistoryStore tests ────────────────────────────────────────
+
+    #[test]
+    fn mem_history_store_record_and_query() {
+        let store = MemHistoryStore::new();
+        HistoryStore::record(&store, "kubectl", "/code/k8s", "pods").unwrap();
+        HistoryStore::record(&store, "kubectl", "/code/k8s", "pods").unwrap();
+        HistoryStore::record(&store, "kubectl", "/code/k8s", "services").unwrap();
+
+        let scores = HistoryStore::frecency_scores(&store, "kubectl", "/code/k8s").unwrap();
+        assert!(scores.contains_key("pods"), "should contain 'pods'");
+        assert!(scores.contains_key("services"), "should contain 'services'");
+        // pods was recorded twice, so its score should be higher
+        assert!(
+            scores["pods"] > scores["services"],
+            "pods ({}) should score higher than services ({})",
+            scores["pods"],
+            scores["services"]
+        );
+    }
+
+    #[test]
+    fn mem_history_store_isolates_commands() {
+        let store = MemHistoryStore::new();
+        HistoryStore::record(&store, "kubectl", "/code", "pods").unwrap();
+        HistoryStore::record(&store, "helm", "/code", "install").unwrap();
+
+        let kubectl_scores = HistoryStore::frecency_scores(&store, "kubectl", "/code").unwrap();
+        let helm_scores = HistoryStore::frecency_scores(&store, "helm", "/code").unwrap();
+
+        assert!(kubectl_scores.contains_key("pods"));
+        assert!(!kubectl_scores.contains_key("install"));
+        assert!(helm_scores.contains_key("install"));
+        assert!(!helm_scores.contains_key("pods"));
+    }
+
+    #[test]
+    fn mem_history_store_empty_query() {
+        let store = MemHistoryStore::new();
+        let scores = HistoryStore::frecency_scores(&store, "cd", "/tmp").unwrap();
+        assert!(scores.is_empty());
     }
 }

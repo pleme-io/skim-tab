@@ -34,6 +34,76 @@ struct ContextData {
     namespace: String,
 }
 
+// ── Loader trait ─────────────────────────────────────────────────────
+
+/// Abstraction over kubeconfig loading for testability.
+/// Returns an `Option<KubeContext>` directly since `KubeConfig` is private.
+pub trait KubeconfigLoader: Send + Sync {
+    fn load(&self) -> Option<KubeContext>;
+}
+
+/// Loads kubeconfig from the filesystem (the production path).
+pub struct FsKubeconfigLoader;
+
+impl KubeconfigLoader for FsKubeconfigLoader {
+    fn load(&self) -> Option<KubeContext> {
+        let paths = kubeconfig_paths();
+        let config = paths.iter().find_map(|p| {
+            std::fs::read_to_string(p)
+                .ok()
+                .and_then(|s| serde_yaml::from_str::<KubeConfig>(&s).ok())
+        })?;
+
+        kube_context_from_config(&config)
+    }
+}
+
+/// Extract a `KubeContext` from a parsed `KubeConfig`.
+fn kube_context_from_config(config: &KubeConfig) -> Option<KubeContext> {
+    let ctx_entry = config
+        .contexts
+        .iter()
+        .find(|c| c.name == config.current_context)?;
+
+    let namespace = if ctx_entry.context.namespace.is_empty() {
+        "default".to_string()
+    } else {
+        ctx_entry.context.namespace.clone()
+    };
+
+    Some(KubeContext {
+        context: config.current_context.clone(),
+        namespace,
+        cluster: ctx_entry.context.cluster.clone(),
+    })
+}
+
+// ── Kubectl runner trait ─────────────────────────────────────────────
+
+/// Abstraction over kubectl subprocess calls for testability.
+pub trait KubectlRunner: Send + Sync {
+    fn run(&self, args: &[&str]) -> Option<String>;
+}
+
+/// Runs kubectl as a real subprocess (the production path).
+pub struct RealKubectlRunner;
+
+impl KubectlRunner for RealKubectlRunner {
+    fn run(&self, args: &[&str]) -> Option<String> {
+        let output = Command::new("kubectl")
+            .args(args)
+            .stderr(std::process::Stdio::null())
+            .output();
+
+        match output {
+            Ok(ref o) if o.status.success() => {
+                Some(String::from_utf8_lossy(&o.stdout).into_owned())
+            }
+            _ => None,
+        }
+    }
+}
+
 // ── Public context ───────────────────────────────────────────────────
 
 /// Parsed kubeconfig — the active context, namespace, and cluster.
@@ -46,30 +116,14 @@ pub struct KubeContext {
 impl KubeContext {
     /// Parse the current kubectl context directly from kubeconfig YAML.
     /// Zero subprocess calls — pure file I/O (~0ms).
+    /// Delegates to `FsKubeconfigLoader`.
     pub fn current() -> Option<Self> {
-        let paths = kubeconfig_paths();
-        let config = paths.iter().find_map(|p| {
-            std::fs::read_to_string(p)
-                .ok()
-                .and_then(|s| serde_yaml::from_str::<KubeConfig>(&s).ok())
-        })?;
+        FsKubeconfigLoader.load()
+    }
 
-        let ctx_entry = config
-            .contexts
-            .iter()
-            .find(|c| c.name == config.current_context)?;
-
-        let namespace = if ctx_entry.context.namespace.is_empty() {
-            "default".to_string()
-        } else {
-            ctx_entry.context.namespace.clone()
-        };
-
-        Some(Self {
-            context: config.current_context,
-            namespace,
-            cluster: ctx_entry.context.cluster.clone(),
-        })
+    /// Parse the current kubectl context using a custom loader (for testing).
+    pub fn with_loader(loader: &dyn KubeconfigLoader) -> Option<Self> {
+        loader.load()
     }
 
     /// Format header string for skim display.
@@ -123,6 +177,16 @@ fn kubeconfig_paths() -> Vec<PathBuf> {
 /// Returns a map from plural type name (e.g., "pods") to count.
 #[must_use]
 pub fn resource_counts(types: &[&str], namespace: Option<&str>) -> HashMap<String, usize> {
+    resource_counts_with(&RealKubectlRunner, types, namespace)
+}
+
+/// Count resources by type using a custom `KubectlRunner`.
+#[must_use]
+pub fn resource_counts_with(
+    runner: &dyn KubectlRunner,
+    types: &[&str],
+    namespace: Option<&str>,
+) -> HashMap<String, usize> {
     if types.is_empty() {
         return HashMap::new();
     }
@@ -133,17 +197,16 @@ pub fn resource_counts(types: &[&str], namespace: Option<&str>) -> HashMap<Strin
         args.extend_from_slice(&["-n", ns]);
     }
 
-    let output = Command::new("kubectl")
-        .args(&args)
-        .stderr(std::process::Stdio::null())
-        .output();
-
-    let stdout = match output {
-        Ok(ref o) if o.status.success() => String::from_utf8_lossy(&o.stdout),
-        _ => return HashMap::new(),
+    let stdout = match runner.run(&args) {
+        Some(s) => s,
+        None => return HashMap::new(),
     };
 
-    // Lines look like: "pod/nginx-xxx" or "deployment.apps/nginx"
+    parse_resource_counts(&stdout)
+}
+
+/// Parse `kubectl get -o name` output into resource type counts.
+fn parse_resource_counts(stdout: &str) -> HashMap<String, usize> {
     let mut counts: HashMap<String, usize> = HashMap::new();
     for line in stdout.lines() {
         if let Some(api_type) = line.split('/').next() {
@@ -198,23 +261,31 @@ fn api_type_to_plural(api_type: &str) -> Cow<'static, str> {
 /// Count pods per namespace via a single `kubectl get pods -A` call.
 #[must_use]
 pub fn namespace_pod_counts() -> HashMap<String, usize> {
-    let output = Command::new("kubectl")
-        .args([
-            "get",
-            "pods",
-            "-A",
-            "--no-headers",
-            "-o",
-            "custom-columns=NS:.metadata.namespace",
-        ])
-        .stderr(std::process::Stdio::null())
-        .output();
+    namespace_pod_counts_with(&RealKubectlRunner)
+}
 
-    let stdout = match output {
-        Ok(ref o) if o.status.success() => String::from_utf8_lossy(&o.stdout),
-        _ => return HashMap::new(),
+/// Count pods per namespace using a custom `KubectlRunner`.
+#[must_use]
+pub fn namespace_pod_counts_with(runner: &dyn KubectlRunner) -> HashMap<String, usize> {
+    let args = [
+        "get",
+        "pods",
+        "-A",
+        "--no-headers",
+        "-o",
+        "custom-columns=NS:.metadata.namespace",
+    ];
+
+    let stdout = match runner.run(&args) {
+        Some(s) => s,
+        None => return HashMap::new(),
     };
 
+    parse_namespace_pod_counts(&stdout)
+}
+
+/// Parse `kubectl get pods -A` custom-columns output into namespace counts.
+fn parse_namespace_pod_counts(stdout: &str) -> HashMap<String, usize> {
     let mut counts: HashMap<String, usize> = HashMap::new();
     for line in stdout.lines() {
         let ns = line.trim();
@@ -223,6 +294,33 @@ pub fn namespace_pod_counts() -> HashMap<String, usize> {
         }
     }
     counts
+}
+
+// ── Test-only mock implementations ──────────────────────────────────
+
+#[cfg(test)]
+pub struct MockKubeconfigLoader {
+    pub yaml: String,
+}
+
+#[cfg(test)]
+impl KubeconfigLoader for MockKubeconfigLoader {
+    fn load(&self) -> Option<KubeContext> {
+        let config = serde_yaml::from_str::<KubeConfig>(&self.yaml).ok()?;
+        kube_context_from_config(&config)
+    }
+}
+
+#[cfg(test)]
+pub struct MockKubectlRunner {
+    pub output: Option<String>,
+}
+
+#[cfg(test)]
+impl KubectlRunner for MockKubectlRunner {
+    fn run(&self, _args: &[&str]) -> Option<String> {
+        self.output.clone()
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -341,5 +439,102 @@ contexts:
         };
         let prompt = ctx.prompt();
         assert!(prompt.contains("plo"));
+    }
+
+    // ── New trait-based tests ────────────────────────────────────────
+
+    #[test]
+    fn kube_context_with_mock_loader() {
+        let loader = MockKubeconfigLoader {
+            yaml: r#"
+apiVersion: v1
+kind: Config
+current-context: staging
+contexts:
+  - name: staging
+    context:
+      cluster: staging-cluster
+      namespace: apps
+"#
+            .to_string(),
+        };
+
+        let ctx = KubeContext::with_loader(&loader).unwrap();
+        assert_eq!(ctx.context, "staging");
+        assert_eq!(ctx.namespace, "apps");
+        assert_eq!(ctx.cluster, "staging-cluster");
+    }
+
+    #[test]
+    fn kube_context_with_mock_loader_default_namespace() {
+        let loader = MockKubeconfigLoader {
+            yaml: r#"
+apiVersion: v1
+kind: Config
+current-context: dev
+contexts:
+  - name: dev
+    context:
+      cluster: dev-cluster
+"#
+            .to_string(),
+        };
+
+        let ctx = KubeContext::with_loader(&loader).unwrap();
+        assert_eq!(ctx.context, "dev");
+        assert_eq!(ctx.namespace, "default");
+        assert_eq!(ctx.cluster, "dev-cluster");
+    }
+
+    #[test]
+    fn resource_counts_with_mock_kubectl() {
+        let runner = MockKubectlRunner {
+            output: Some(
+                "pod/nginx-abc\npod/redis-xyz\ndeployment.apps/web\nservice/api\nservice/db\n"
+                    .to_string(),
+            ),
+        };
+
+        let counts = resource_counts_with(&runner, &["pods", "deployments", "services"], None);
+        assert_eq!(counts.get("pods"), Some(&2));
+        assert_eq!(counts.get("deployments"), Some(&1));
+        assert_eq!(counts.get("services"), Some(&2));
+    }
+
+    #[test]
+    fn resource_counts_with_mock_kubectl_empty() {
+        let runner = MockKubectlRunner { output: None };
+        let counts = resource_counts_with(&runner, &["pods"], None);
+        assert!(counts.is_empty());
+    }
+
+    #[test]
+    fn resource_counts_with_mock_kubectl_empty_types() {
+        let runner = MockKubectlRunner {
+            output: Some("pod/nginx\n".to_string()),
+        };
+        let counts = resource_counts_with(&runner, &[], None);
+        assert!(counts.is_empty());
+    }
+
+    #[test]
+    fn namespace_pod_counts_with_mock_kubectl() {
+        let runner = MockKubectlRunner {
+            output: Some(
+                "kube-system\nkube-system\nkube-system\ndefault\ndefault\napps\n".to_string(),
+            ),
+        };
+
+        let counts = namespace_pod_counts_with(&runner);
+        assert_eq!(counts.get("kube-system"), Some(&3));
+        assert_eq!(counts.get("default"), Some(&2));
+        assert_eq!(counts.get("apps"), Some(&1));
+    }
+
+    #[test]
+    fn namespace_pod_counts_with_mock_kubectl_empty() {
+        let runner = MockKubectlRunner { output: None };
+        let counts = namespace_pod_counts_with(&runner);
+        assert!(counts.is_empty());
     }
 }
