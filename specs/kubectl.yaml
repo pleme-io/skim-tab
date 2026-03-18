@@ -1,0 +1,356 @@
+commands: [kubectl, kubecolor, k]
+icon: "\u2388 "
+subcommands:
+  # Subcommands
+  get:
+    description: "Display resources"
+    glyph: "\u25C8"
+  describe:
+    description: "Show resource details"
+    glyph: "\u25C8"
+  apply:
+    description: "Apply configuration"
+    glyph: "\u25C7"
+  delete:
+    description: "Delete resources"
+    glyph: "\u25C7"
+  edit:
+    description: "Edit a resource"
+    glyph: "\u25C7"
+  create:
+    description: "Create from file or stdin"
+    glyph: "\u25C7"
+  expose:
+    description: "Expose as a service"
+    glyph: "\u21BB"
+  run:
+    description: "Run a pod"
+    glyph: "\u25B8"
+  set:
+    description: "Set resource fields"
+    glyph: "\u21BB"
+  explain:
+    description: "Documentation of resources"
+    glyph: "\u25C8"
+  rollout:
+    description: "Manage rollouts"
+    glyph: "\u21BB"
+  scale:
+    description: "Scale a resource"
+    glyph: "\u21BB"
+  autoscale:
+    description: "Auto-scale a resource"
+    glyph: "\u21BB"
+  exec:
+    description: "Execute in a container"
+    glyph: "\u25B8"
+  logs:
+    description: "Print container logs"
+    glyph: "\u25B8"
+  attach:
+    description: "Attach to a container"
+    glyph: "\u25B8"
+  port-forward:
+    description: "Forward ports to a pod"
+    glyph: "\u25B8"
+  cp:
+    description: "Copy files to/from containers"
+    glyph: "\u25C7"
+  top:
+    description: "Resource usage (CPU/memory)"
+    glyph: "\u25C8"
+  debug:
+    description: "Debug workloads"
+    glyph: "\u25B8"
+  cordon:
+    description: "Mark node unschedulable"
+    glyph: "\u229E"
+  uncordon:
+    description: "Mark node schedulable"
+    glyph: "\u229E"
+  drain:
+    description: "Drain a node"
+    glyph: "\u229E"
+  taint:
+    description: "Set node taints"
+    glyph: "\u229E"
+  label:
+    description: "Update labels"
+    glyph: "\u229E"
+  annotate:
+    description: "Update annotations"
+    glyph: "\u229E"
+  patch:
+    description: "Patch a resource"
+    glyph: "\u25C7"
+  replace:
+    description: "Replace a resource"
+    glyph: "\u25C7"
+  wait:
+    description: "Wait for a condition"
+    glyph: "\u2299"
+  config:
+    description: "Modify kubeconfig"
+    glyph: "\u2299"
+  cluster-info:
+    description: "Cluster endpoint info"
+    glyph: "\u229E"
+  api-resources:
+    description: "List API resource types"
+    glyph: "\u25C8"
+  api-versions:
+    description: "List API versions"
+    glyph: "\u25C8"
+  version:
+    description: "Client and server version"
+    glyph: "\u25C8"
+  diff:
+    description: "Diff live vs applied"
+    glyph: "\u25C8"
+  kustomize:
+    description: "Build kustomization target"
+    glyph: "\u2299"
+  auth:
+    description: "Inspect authorization"
+    glyph: "\u2299"
+  certificate:
+    description: "Certificate operations"
+    glyph: "\u2299"
+  proxy:
+    description: "API server proxy"
+    glyph: "\u2299"
+  plugin:
+    description: "Plugin utilities"
+    glyph: "\u2299"
+  completion:
+    description: "Shell completion"
+    glyph: "\u2299"
+  # Resource types (including abbreviations)
+  pods:
+    description: "Pod workloads"
+    glyph: "\u25C9"
+  pod:
+    description: "Pod workloads"
+    glyph: "\u25C9"
+  po:
+    description: "Pod workloads"
+    glyph: "\u25C9"
+  deployments:
+    description: "Managed replicas"
+    glyph: "\u25CE"
+  deployment:
+    description: "Managed replicas"
+    glyph: "\u25CE"
+  deploy:
+    description: "Managed replicas"
+    glyph: "\u25CE"
+  services:
+    description: "Network endpoints"
+    glyph: "\u2295"
+  service:
+    description: "Network endpoints"
+    glyph: "\u2295"
+  svc:
+    description: "Network endpoints"
+    glyph: "\u2295"
+  nodes:
+    description: "Cluster machines"
+    glyph: "\u2B21"
+  node:
+    description: "Cluster machines"
+    glyph: "\u2B21"
+  "no":
+    description: "Cluster machines"
+    glyph: "\u2B21"
+  namespaces:
+    description: "Resource scopes"
+    glyph: "\u229E"
+  namespace:
+    description: "Resource scopes"
+    glyph: "\u229E"
+  ns:
+    description: "Resource scopes"
+    glyph: "\u229E"
+  configmaps:
+    description: "Configuration data"
+    glyph: "\u2299"
+  configmap:
+    description: "Configuration data"
+    glyph: "\u2299"
+  cm:
+    description: "Configuration data"
+    glyph: "\u2299"
+  secrets:
+    description: "Sensitive data"
+    glyph: "\u25C8"
+  secret:
+    description: "Sensitive data"
+    glyph: "\u25C8"
+  ingresses:
+    description: "External access rules"
+    glyph: "\u21E5"
+  ingress:
+    description: "External access rules"
+    glyph: "\u21E5"
+  ing:
+    description: "External access rules"
+    glyph: "\u21E5"
+  persistentvolumeclaims:
+    description: "Storage claims"
+    glyph: "\u25A4"
+  pvc:
+    description: "Storage claims"
+    glyph: "\u25A4"
+  persistentvolumes:
+    description: "Storage volumes"
+    glyph: "\u25A4"
+  pv:
+    description: "Storage volumes"
+    glyph: "\u25A4"
+  statefulsets:
+    description: "Stateful workloads"
+    glyph: "\u22A1"
+  statefulset:
+    description: "Stateful workloads"
+    glyph: "\u22A1"
+  sts:
+    description: "Stateful workloads"
+    glyph: "\u22A1"
+  daemonsets:
+    description: "Per-node workloads"
+    glyph: "\u229A"
+  daemonset:
+    description: "Per-node workloads"
+    glyph: "\u229A"
+  ds:
+    description: "Per-node workloads"
+    glyph: "\u229A"
+  jobs:
+    description: "Run-to-completion tasks"
+    glyph: "\u25B8"
+  job:
+    description: "Run-to-completion tasks"
+    glyph: "\u25B8"
+  cronjobs:
+    description: "Scheduled jobs"
+    glyph: "\u21BB"
+  cronjob:
+    description: "Scheduled jobs"
+    glyph: "\u21BB"
+  cj:
+    description: "Scheduled jobs"
+    glyph: "\u21BB"
+  replicasets:
+    description: "Pod replica sets"
+    glyph: "\u25CE"
+  replicaset:
+    description: "Pod replica sets"
+    glyph: "\u25CE"
+  rs:
+    description: "Pod replica sets"
+    glyph: "\u25CE"
+  serviceaccounts:
+    description: "Identities for pods"
+    glyph: "\u269B"
+  serviceaccount:
+    description: "Identities for pods"
+    glyph: "\u269B"
+  sa:
+    description: "Identities for pods"
+    glyph: "\u269B"
+  roles:
+    description: "Namespaced permissions"
+    glyph: "\u269B"
+  role:
+    description: "Namespaced permissions"
+    glyph: "\u269B"
+  clusterroles:
+    description: "Cluster-wide permissions"
+    glyph: "\u269B"
+  clusterrole:
+    description: "Cluster-wide permissions"
+    glyph: "\u269B"
+  rolebindings:
+    description: "Bind role to subject"
+    glyph: "\u269B"
+  rolebinding:
+    description: "Bind role to subject"
+    glyph: "\u269B"
+  clusterrolebindings:
+    description: "Cluster role binding"
+    glyph: "\u269B"
+  clusterrolebinding:
+    description: "Cluster role binding"
+    glyph: "\u269B"
+  networkpolicies:
+    description: "Network access rules"
+    glyph: "\u2298"
+  networkpolicy:
+    description: "Network access rules"
+    glyph: "\u2298"
+  netpol:
+    description: "Network access rules"
+    glyph: "\u2298"
+  storageclasses:
+    description: "Storage provisioners"
+    glyph: "\u25A4"
+  storageclass:
+    description: "Storage provisioners"
+    glyph: "\u25A4"
+  sc:
+    description: "Storage provisioners"
+    glyph: "\u25A4"
+  events:
+    description: "Cluster events"
+    glyph: "\u25C7"
+  event:
+    description: "Cluster events"
+    glyph: "\u25C7"
+  ev:
+    description: "Cluster events"
+    glyph: "\u25C7"
+  endpoints:
+    description: "Service endpoints"
+    glyph: "\u2295"
+  ep:
+    description: "Service endpoints"
+    glyph: "\u2295"
+  horizontalpodautoscalers:
+    description: "Auto-scaling rules"
+    glyph: "\u21BB"
+  hpa:
+    description: "Auto-scaling rules"
+    glyph: "\u21BB"
+  poddisruptionbudgets:
+    description: "Disruption limits"
+    glyph: "\u2298"
+  pdb:
+    description: "Disruption limits"
+    glyph: "\u2298"
+  limitranges:
+    description: "Resource constraints"
+    glyph: "\u2298"
+  limitrange:
+    description: "Resource constraints"
+    glyph: "\u2298"
+  limits:
+    description: "Resource constraints"
+    glyph: "\u2298"
+  resourcequotas:
+    description: "Namespace quotas"
+    glyph: "\u2298"
+  resourcequota:
+    description: "Namespace quotas"
+    glyph: "\u2298"
+  quota:
+    description: "Namespace quotas"
+    glyph: "\u2298"
+  customresourcedefinitions:
+    description: "Custom API types"
+    glyph: "\u2726"
+  crd:
+    description: "Custom API types"
+    glyph: "\u2726"
+  crds:
+    description: "Custom API types"
+    glyph: "\u2726"

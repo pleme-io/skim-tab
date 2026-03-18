@@ -1,0 +1,157 @@
+commands: [flux]
+icon: "\u2388 "
+subcommands:
+  get:
+    description: "Display Flux resources"
+    glyph: "\u25C8"
+  reconcile:
+    description: "Trigger reconciliation"
+    glyph: "\u21BB"
+  suspend:
+    description: "Suspend reconciliation"
+    glyph: "\u21BB"
+  resume:
+    description: "Resume reconciliation"
+    glyph: "\u21BB"
+  create:
+    description: "Create Flux resources"
+    glyph: "\u25C7"
+  delete:
+    description: "Delete Flux resources"
+    glyph: "\u25C7"
+  export:
+    description: "Export resources as YAML"
+    glyph: "\u25C7"
+  install:
+    description: "Install Flux components"
+    glyph: "\u25B8"
+  uninstall:
+    description: "Uninstall Flux"
+    glyph: "\u25B8"
+  bootstrap:
+    description: "Bootstrap Flux on a cluster"
+    glyph: "\u25B8"
+  check:
+    description: "Pre-flight checks"
+    glyph: "\u25B8"
+  logs:
+    description: "Flux controller logs"
+    glyph: "\u25B8"
+  events:
+    description: "Flux events"
+    glyph: "\u25C8"
+  tree:
+    description: "Resource dependency tree"
+    glyph: "\u25C8"
+  trace:
+    description: "Trace a Flux resource"
+    glyph: "\u25C8"
+  stats:
+    description: "Reconciliation statistics"
+    glyph: "\u25C8"
+  diff:
+    description: "Diff live vs desired"
+    glyph: "\u25C8"
+  build:
+    description: "Build kustomization locally"
+    glyph: "\u25B8"
+  push:
+    description: "Push artifact to OCI"
+    glyph: "\u2299"
+  pull:
+    description: "Pull artifact from OCI"
+    glyph: "\u2299"
+  tag:
+    description: "Tag an OCI artifact"
+    glyph: "\u2299"
+  version:
+    description: "Flux CLI version"
+    glyph: "\u25C8"
+  completion:
+    description: "Shell completion"
+    glyph: "\u2299"
+  # Resource types
+  kustomizations:
+    description: "Kustomize reconciler"
+    glyph: "\u21BB"
+  kustomization:
+    description: "Kustomize reconciler"
+    glyph: "\u21BB"
+  ks:
+    description: "Kustomize reconciler"
+    glyph: "\u21BB"
+  helmreleases:
+    description: "Helm release reconciler"
+    glyph: "\u2295"
+  helmrelease:
+    description: "Helm release reconciler"
+    glyph: "\u2295"
+  hr:
+    description: "Helm release reconciler"
+    glyph: "\u2295"
+  gitrepositories:
+    description: "Git source"
+    glyph: "\u25CE"
+  gitrepository:
+    description: "Git source"
+    glyph: "\u25CE"
+  helmrepositories:
+    description: "Helm chart source"
+    glyph: "\u25CE"
+  helmrepository:
+    description: "Helm chart source"
+    glyph: "\u25CE"
+  helmcharts:
+    description: "Helm chart artifact"
+    glyph: "\u22A1"
+  helmchart:
+    description: "Helm chart artifact"
+    glyph: "\u22A1"
+  ocirepositories:
+    description: "OCI artifact source"
+    glyph: "\u25CE"
+  ocirepository:
+    description: "OCI artifact source"
+    glyph: "\u25CE"
+  buckets:
+    description: "S3-compatible source"
+    glyph: "\u25CE"
+  bucket:
+    description: "S3-compatible source"
+    glyph: "\u25CE"
+  receivers:
+    description: "Webhook receiver"
+    glyph: "\u25C7"
+  receiver:
+    description: "Webhook receiver"
+    glyph: "\u25C7"
+  alerts:
+    description: "Alert rule"
+    glyph: "\u25C7"
+  alert:
+    description: "Alert rule"
+    glyph: "\u25C7"
+  providers:
+    description: "Notification provider"
+    glyph: "\u25C7"
+  provider:
+    description: "Notification provider"
+    glyph: "\u25C7"
+  imagepolicies:
+    description: "Image update policy"
+    glyph: "\u21BB"
+  imagepolicy:
+    description: "Image update policy"
+    glyph: "\u21BB"
+  imagerepositories:
+    description: "Image scan config"
+    glyph: "\u25CE"
+  imagerepository:
+    description: "Image scan config"
+    glyph: "\u25CE"
+  imageupdateautomations:
+    description: "Image auto-update"
+    glyph: "\u21BB"
+  imageupdateautomation:
+    description: "Image auto-update"
+    glyph: "\u21BB"

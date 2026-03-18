@@ -47,6 +47,19 @@ pub struct SubcommandSpec {
     pub flags: HashMap<String, String>,
 }
 
+// ── Trait ─────────────────────────────────────────────────────────────
+
+/// Abstraction over description lookup and icon resolution.
+///
+/// Implemented by `SpecRegistry` for production use and
+/// `MockDescriptionProvider` for testing.
+pub trait DescriptionProvider {
+    /// Look up (glyph, description) for a word under a command.
+    fn lookup(&self, command: &str, word: &str) -> Option<(String, String)>;
+    /// Get the prompt icon for a command, or None.
+    fn icon(&self, command: &str) -> Option<&str>;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────
 
 /// Aggregated registry of all loaded completion specs.
@@ -65,6 +78,12 @@ const BUILTIN_SPECS: &[(&str, &str)] = &[
     ("git.yaml", include_str!("../specs/git.yaml")),
     ("npm.yaml", include_str!("../specs/npm.yaml")),
     ("terraform.yaml", include_str!("../specs/terraform.yaml")),
+    ("aws.yaml", include_str!("../specs/aws.yaml")),
+    ("gcloud.yaml", include_str!("../specs/gcloud.yaml")),
+    ("az.yaml", include_str!("../specs/az.yaml")),
+    ("kubectl.yaml", include_str!("../specs/kubectl.yaml")),
+    ("helm.yaml", include_str!("../specs/helm.yaml")),
+    ("flux.yaml", include_str!("../specs/flux.yaml")),
 ];
 
 /// Global singleton registry, lazily initialized on first access.
@@ -112,11 +131,21 @@ impl SpecRegistry {
         Self { specs }
     }
 
+    /// Get the global singleton registry.
+    ///
+    /// Initializes on first call using the provided config. Subsequent
+    /// calls return the same registry regardless of config changes.
+    pub fn global(specs_cfg: &config::SpecsConfig) -> &'static Self {
+        GLOBAL_REGISTRY.get_or_init(|| Self::new(specs_cfg))
+    }
+}
+
+impl DescriptionProvider for SpecRegistry {
     /// Look up (glyph, description) for a word under a command.
     ///
     /// Searches specs in reverse order so that later-loaded specs
     /// (project > user > built-in) take priority.
-    pub fn lookup(&self, command: &str, word: &str) -> Option<(String, String)> {
+    fn lookup(&self, command: &str, word: &str) -> Option<(String, String)> {
         // Search in reverse so later specs (higher priority) win.
         for spec in self.specs.iter().rev() {
             if spec.commands.iter().any(|c| c == command) {
@@ -134,7 +163,7 @@ impl SpecRegistry {
     }
 
     /// Get the prompt icon for a command from specs, or None.
-    pub fn icon(&self, command: &str) -> Option<&str> {
+    fn icon(&self, command: &str) -> Option<&str> {
         for spec in self.specs.iter().rev() {
             if spec.commands.iter().any(|c| c == command) {
                 if let Some(ref icon) = spec.icon {
@@ -144,13 +173,39 @@ impl SpecRegistry {
         }
         None
     }
+}
 
-    /// Get the global singleton registry.
-    ///
-    /// Initializes on first call using the provided config. Subsequent
-    /// calls return the same registry regardless of config changes.
-    pub fn global(specs_cfg: &config::SpecsConfig) -> &'static Self {
-        GLOBAL_REGISTRY.get_or_init(|| Self::new(specs_cfg))
+// ── Mock provider ─────────────────────────────────────────────────────
+
+/// Test-only description provider with configurable responses.
+#[cfg(test)]
+pub struct MockDescriptionProvider {
+    /// (command, word) -> (glyph, description)
+    pub entries: HashMap<(String, String), (String, String)>,
+    /// command -> icon
+    pub icons: HashMap<String, String>,
+}
+
+#[cfg(test)]
+impl MockDescriptionProvider {
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+            icons: HashMap::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+impl DescriptionProvider for MockDescriptionProvider {
+    fn lookup(&self, command: &str, word: &str) -> Option<(String, String)> {
+        self.entries
+            .get(&(command.to_string(), word.to_string()))
+            .cloned()
+    }
+
+    fn icon(&self, command: &str) -> Option<&str> {
+        self.icons.get(command).map(String::as_str)
     }
 }
 
@@ -228,14 +283,14 @@ mod tests {
     #[test]
     fn builtin_specs_load() {
         let reg = SpecRegistry::new(&default_specs_config());
-        // Should have all built-in specs (docker, nix, cargo, git, npm, terraform)
+        // Should have all 12 built-in specs
         assert!(reg.specs.len() >= 2);
     }
 
     #[test]
     fn lookup_docker_run() {
         let reg = SpecRegistry::new(&default_specs_config());
-        let result = reg.lookup("docker", "run");
+        let result = DescriptionProvider::lookup(&reg, "docker", "run");
         assert!(result.is_some());
         let (glyph, desc) = result.unwrap();
         assert_eq!(desc, "Run a container");
@@ -245,7 +300,7 @@ mod tests {
     #[test]
     fn lookup_podman_alias() {
         let reg = SpecRegistry::new(&default_specs_config());
-        let result = reg.lookup("podman", "build");
+        let result = DescriptionProvider::lookup(&reg, "podman", "build");
         assert!(result.is_some());
         let (_, desc) = result.unwrap();
         assert_eq!(desc, "Build an image");
@@ -254,7 +309,7 @@ mod tests {
     #[test]
     fn lookup_nix_build() {
         let reg = SpecRegistry::new(&default_specs_config());
-        let result = reg.lookup("nix", "build");
+        let result = DescriptionProvider::lookup(&reg, "nix", "build");
         assert!(result.is_some());
         let (glyph, desc) = result.unwrap();
         assert_eq!(desc, "Build a derivation");
@@ -264,26 +319,26 @@ mod tests {
     #[test]
     fn lookup_unknown_command() {
         let reg = SpecRegistry::new(&default_specs_config());
-        assert!(reg.lookup("nonexistent-tool", "run").is_none());
+        assert!(DescriptionProvider::lookup(&reg, "nonexistent-tool", "run").is_none());
     }
 
     #[test]
     fn lookup_unknown_word() {
         let reg = SpecRegistry::new(&default_specs_config());
-        assert!(reg.lookup("docker", "nonexistent-subcommand").is_none());
+        assert!(DescriptionProvider::lookup(&reg, "docker", "nonexistent-subcommand").is_none());
     }
 
     #[test]
     fn icon_docker() {
         let reg = SpecRegistry::new(&default_specs_config());
-        let icon = reg.icon("docker");
+        let icon = DescriptionProvider::icon(&reg, "docker");
         assert!(icon.is_some());
     }
 
     #[test]
     fn icon_unknown_command() {
         let reg = SpecRegistry::new(&default_specs_config());
-        assert!(reg.icon("unknown-tool").is_none());
+        assert!(DescriptionProvider::icon(&reg, "unknown-tool").is_none());
     }
 
     #[test]
@@ -295,7 +350,7 @@ mod tests {
         };
         let reg = SpecRegistry::new(&cfg);
         assert!(reg.specs.is_empty());
-        assert!(reg.lookup("docker", "run").is_none());
+        assert!(DescriptionProvider::lookup(&reg, "docker", "run").is_none());
     }
 
     #[test]
@@ -336,5 +391,133 @@ mod tests {
         let flake = &spec.subcommands["flake"];
         assert!(flake.subcommands.contains_key("update"));
         assert!(flake.subcommands.contains_key("check"));
+    }
+
+    #[test]
+    fn lookup_aws_s3() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        let result = DescriptionProvider::lookup(&reg, "aws", "s3");
+        assert!(result.is_some());
+        let (_, desc) = result.unwrap();
+        assert_eq!(desc, "Object storage");
+    }
+
+    #[test]
+    fn lookup_gcloud_compute() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        let result = DescriptionProvider::lookup(&reg, "gcloud", "compute");
+        assert!(result.is_some());
+        let (_, desc) = result.unwrap();
+        assert_eq!(desc, "Virtual machines & disks");
+    }
+
+    #[test]
+    fn lookup_az_vm() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        let result = DescriptionProvider::lookup(&reg, "az", "vm");
+        assert!(result.is_some());
+        let (_, desc) = result.unwrap();
+        assert_eq!(desc, "Virtual machines");
+    }
+
+    // ── New YAML spec parsing tests ────────────────────────────────
+
+    #[test]
+    fn parse_kubectl_yaml() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[9].1).expect("kubectl.yaml should parse");
+        assert!(spec.commands.contains(&"kubectl".to_string()));
+        assert!(spec.commands.contains(&"kubecolor".to_string()));
+        assert!(spec.commands.contains(&"k".to_string()));
+        assert!(spec.subcommands.contains_key("get"));
+        assert!(spec.subcommands.contains_key("apply"));
+        assert!(spec.subcommands.contains_key("pods"));
+        assert!(spec.subcommands.contains_key("deploy"));
+        assert!(spec.subcommands.contains_key("crd"));
+        assert!(spec.icon.is_some());
+    }
+
+    #[test]
+    fn parse_helm_yaml() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[10].1).expect("helm.yaml should parse");
+        assert!(spec.commands.contains(&"helm".to_string()));
+        assert!(spec.subcommands.contains_key("install"));
+        assert!(spec.subcommands.contains_key("upgrade"));
+        assert!(spec.subcommands.contains_key("values"));
+        assert!(spec.icon.is_some());
+    }
+
+    #[test]
+    fn parse_flux_yaml() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[11].1).expect("flux.yaml should parse");
+        assert!(spec.commands.contains(&"flux".to_string()));
+        assert!(spec.subcommands.contains_key("reconcile"));
+        assert!(spec.subcommands.contains_key("kustomizations"));
+        assert!(spec.subcommands.contains_key("hr"));
+        assert!(spec.icon.is_some());
+    }
+
+    #[test]
+    fn lookup_kubectl_aliases() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        // "kubectl" command
+        let result = DescriptionProvider::lookup(&reg, "kubectl", "pods");
+        assert!(result.is_some());
+        let (glyph, desc) = result.unwrap();
+        assert_eq!(desc, "Pod workloads");
+        assert!(!glyph.is_empty());
+
+        // "k" alias
+        let result_k = DescriptionProvider::lookup(&reg, "k", "deploy");
+        assert!(result_k.is_some());
+        let (_, desc_k) = result_k.unwrap();
+        assert_eq!(desc_k, "Managed replicas");
+
+        // "kubecolor" alias
+        let result_kc = DescriptionProvider::lookup(&reg, "kubecolor", "get");
+        assert!(result_kc.is_some());
+        let (_, desc_kc) = result_kc.unwrap();
+        assert_eq!(desc_kc, "Display resources");
+    }
+
+    #[test]
+    fn all_12_specs_parse() {
+        assert_eq!(BUILTIN_SPECS.len(), 12);
+        for (name, content) in BUILTIN_SPECS {
+            let result = serde_yaml::from_str::<CompletionSpec>(content);
+            assert!(result.is_ok(), "failed to parse {name}: {:?}", result.err());
+        }
+    }
+
+    #[test]
+    fn icon_kubectl() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        assert!(DescriptionProvider::icon(&reg, "kubectl").is_some());
+        assert!(DescriptionProvider::icon(&reg, "k").is_some());
+        assert!(DescriptionProvider::icon(&reg, "helm").is_some());
+        assert!(DescriptionProvider::icon(&reg, "flux").is_some());
+    }
+
+    #[test]
+    fn mock_provider_lookup() {
+        let mut mock = MockDescriptionProvider::new();
+        mock.entries.insert(
+            ("test-cmd".to_string(), "sub".to_string()),
+            ("G".to_string(), "A description".to_string()),
+        );
+        mock.icons
+            .insert("test-cmd".to_string(), "T ".to_string());
+
+        let result = DescriptionProvider::lookup(&mock, "test-cmd", "sub");
+        assert_eq!(
+            result,
+            Some(("G".to_string(), "A description".to_string()))
+        );
+        assert!(DescriptionProvider::lookup(&mock, "test-cmd", "missing").is_none());
+
+        assert_eq!(DescriptionProvider::icon(&mock, "test-cmd"), Some("T "));
+        assert!(DescriptionProvider::icon(&mock, "other").is_none());
     }
 }
