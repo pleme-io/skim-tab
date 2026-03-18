@@ -1,0 +1,75 @@
+commands: [az]
+icon: "\u2601"
+subcommands:
+  vm:
+    description: "Virtual machines"
+    glyph: "\u25B8"
+  aks:
+    description: "Kubernetes Service"
+    glyph: "\u25B8"
+  acr:
+    description: "Container Registry"
+    glyph: "\u25B8"
+  storage:
+    description: "Storage accounts"
+    glyph: "\u25A4"
+  network:
+    description: "Virtual networks"
+    glyph: "\u2295"
+  webapp:
+    description: "Web Apps"
+    glyph: "\u25B8"
+  functionapp:
+    description: "Function Apps"
+    glyph: "\u25B8"
+  sql:
+    description: "SQL databases"
+    glyph: "\u25C7"
+  cosmosdb:
+    description: "Cosmos DB"
+    glyph: "\u25C7"
+  keyvault:
+    description: "Key Vault"
+    glyph: "\u25C8"
+  monitor:
+    description: "Monitoring"
+    glyph: "\u25C8"
+  identity:
+    description: "Managed identities"
+    glyph: "\u25C8"
+  group:
+    description: "Resource groups"
+    glyph: "\u2299"
+  account:
+    description: "Subscriptions"
+    glyph: "\u2299"
+  ad:
+    description: "Azure AD"
+    glyph: "\u25C8"
+  resource:
+    description: "Resources"
+    glyph: "\u2299"
+  policy:
+    description: "Azure Policy"
+    glyph: "\u25C8"
+  role:
+    description: "Role assignments"
+    glyph: "\u25C8"
+  appservice:
+    description: "App Service"
+    glyph: "\u25B8"
+  container:
+    description: "Container Instances"
+    glyph: "\u25B8"
+  servicebus:
+    description: "Service Bus"
+    glyph: "\u2295"
+  eventhubs:
+    description: "Event Hubs"
+    glyph: "\u2295"
+  cognitiveservices:
+    description: "AI services"
+    glyph: "\u25B8"
+  iot:
+    description: "IoT Hub"
+    glyph: "\u2295"

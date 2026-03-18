@@ -4,7 +4,7 @@
 
 ```bash
 cargo build          # compile
-cargo test           # unit tests
+cargo test           # 185 tests across all binaries
 cargo check          # type-check only
 ```
 
@@ -36,7 +36,8 @@ Tab pressed
 | Path | Purpose |
 |------|---------|
 | `src/main.rs` | CLI dispatch: --complete, --preview, --history, --files, etc. |
-| `src/complete.rs` | Core completion: compcap parsing, colorization, skim runner, selection |
+| `src/complete.rs` | Core completion: compcap parsing, colorization, skim runner, selection. `is_k8s_command()` for explicit K8s detection |
+| `src/specs.rs` | `DescriptionProvider` trait, `SpecRegistry` (12 built-in YAML specs), `CompletionSpec` serde types |
 | `src/config.rs` | shikumi-based YAML config with feature flags |
 | `src/descent.rs` | In-picker directory descent (optional, gated by config) |
 | `src/history.rs` | Ctrl+R history search with lossy UTF-8 |
@@ -80,10 +81,35 @@ completion:
     k8s_live: true                # live kubectl resource counts
 ```
 
+### YAML Completion Specs
+
+12 built-in specs compiled into the binary via `BUILTIN_SPECS`:
+
+| Spec | Commands | Entries |
+|------|----------|---------|
+| `kubectl.yaml` | kubectl, kubecolor, k | 35 subcommands + 76 resource types |
+| `helm.yaml` | helm | 27 subcommands + 5 show-subcommands |
+| `flux.yaml` | flux | 22 subcommands + 30 resource types |
+| `docker.yaml` | docker, podman | 13 subcommands |
+| `git.yaml` | git | 22 subcommands |
+| `nix.yaml` | nix | 17 subcommands (with nesting) |
+| `cargo.yaml` | cargo | 18 subcommands |
+| `npm.yaml` | npm, pnpm, yarn | 12 subcommands |
+| `terraform.yaml` | terraform, tofu | 12 subcommands |
+| `aws.yaml` | aws | 26 services |
+| `gcloud.yaml` | gcloud | 23 services |
+| `az.yaml` | az | 24 services |
+
+User specs from `~/.config/skim-tab/specs/` override built-ins. Project specs from `.skim-tab/specs/` override both.
+
+Auto-generated specs can be produced by **completion-forge** from OpenAPI specs.
+
 ### Key Design Decisions
 
 - **Rust-first**: All intelligence (dir detection, path stat, enrichment, colorization) in Rust. Zsh is a thin wrapper.
 - **Config-gated features**: Every feature has a flag. Defaults match current behavior. New features opt-in.
+- **YAML-driven descriptions**: All command descriptions live in YAML specs (no hardcoded registries). `DescriptionProvider` trait abstracts lookup.
+- **Explicit K8s detection**: `is_k8s_command()` matches only kubectl/kubecolor/k/helm/flux — prevents aws/gcloud/az from triggering kubectl calls.
 - **Native fallback for path descent**: When LBUFFER ends with /, bypass skim and let zsh's `_path_files` handle IPREFIX splitting. This is the only way to get correct multi-level cd descent without reimplementing zsh's path completer.
 - **compadd -Q**: Required for the fzf-tab protocol but prevents zsh from managing directory suffixes. We compensate by appending / in Rust and signaling no-space to zsh.
 

@@ -1,0 +1,72 @@
+commands: [gcloud]
+icon: "\u2601"
+subcommands:
+  compute:
+    description: "Virtual machines & disks"
+    glyph: "\u25B8"
+  container:
+    description: "Kubernetes Engine"
+    glyph: "\u25B8"
+  iam:
+    description: "Identity & access"
+    glyph: "\u25C8"
+  functions:
+    description: "Cloud Functions"
+    glyph: "\u25B8"
+  run:
+    description: "Cloud Run"
+    glyph: "\u25B8"
+  app:
+    description: "App Engine"
+    glyph: "\u25B8"
+  sql:
+    description: "Cloud SQL"
+    glyph: "\u25C7"
+  storage:
+    description: "Cloud Storage"
+    glyph: "\u25A4"
+  pubsub:
+    description: "Pub/Sub messaging"
+    glyph: "\u2295"
+  dns:
+    description: "Cloud DNS"
+    glyph: "\u2295"
+  config:
+    description: "CLI configuration"
+    glyph: "\u2299"
+  auth:
+    description: "Authentication"
+    glyph: "\u25C8"
+  projects:
+    description: "Project management"
+    glyph: "\u2299"
+  builds:
+    description: "Cloud Build"
+    glyph: "\u25B8"
+  deploy:
+    description: "Cloud Deploy"
+    glyph: "\u21BB"
+  logging:
+    description: "Cloud Logging"
+    glyph: "\u25C8"
+  monitoring:
+    description: "Cloud Monitoring"
+    glyph: "\u25C8"
+  artifacts:
+    description: "Artifact Registry"
+    glyph: "\u25C7"
+  secrets:
+    description: "Secret Manager"
+    glyph: "\u25C8"
+  kms:
+    description: "Key Management"
+    glyph: "\u25C8"
+  services:
+    description: "Service management"
+    glyph: "\u2299"
+  networks:
+    description: "VPC networks"
+    glyph: "\u2295"
+  firewall-rules:
+    description: "Firewall rules"
+    glyph: "\u2295"

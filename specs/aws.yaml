@@ -1,0 +1,78 @@
+commands: [aws]
+icon: "\u2601"
+subcommands:
+  s3:
+    description: "Object storage"
+    glyph: "\u25A4"
+  ec2:
+    description: "Virtual machines"
+    glyph: "\u25B8"
+  iam:
+    description: "Identity & access"
+    glyph: "\u25C8"
+  lambda:
+    description: "Serverless functions"
+    glyph: "\u25B8"
+  ecs:
+    description: "Container service"
+    glyph: "\u25B8"
+  eks:
+    description: "Kubernetes service"
+    glyph: "\u25B8"
+  rds:
+    description: "Relational databases"
+    glyph: "\u25C7"
+  dynamodb:
+    description: "NoSQL database"
+    glyph: "\u25C7"
+  cloudformation:
+    description: "Infrastructure as code"
+    glyph: "\u21BB"
+  cloudwatch:
+    description: "Monitoring & logs"
+    glyph: "\u25C8"
+  sns:
+    description: "Pub/sub notifications"
+    glyph: "\u2295"
+  sqs:
+    description: "Message queues"
+    glyph: "\u2295"
+  route53:
+    description: "DNS management"
+    glyph: "\u2295"
+  sts:
+    description: "Security tokens"
+    glyph: "\u25C8"
+  ssm:
+    description: "Systems manager"
+    glyph: "\u2299"
+  secretsmanager:
+    description: "Secret storage"
+    glyph: "\u25C8"
+  ecr:
+    description: "Container registry"
+    glyph: "\u25B8"
+  logs:
+    description: "CloudWatch logs"
+    glyph: "\u25C8"
+  kms:
+    description: "Key management"
+    glyph: "\u25C8"
+  apigateway:
+    description: "API management"
+    glyph: "\u2295"
+  elb:
+    description: "Load balancing"
+    glyph: "\u2295"
+  autoscaling:
+    description: "Auto scaling"
+    glyph: "\u21BB"
+  codebuild:
+    description: "Build service"
+    glyph: "\u25B8"
+  codepipeline:
+    description: "CI/CD pipeline"
+    glyph: "\u21BB"
+  codecommit:
+    description: "Git hosting"
+    glyph: "\u25C7"

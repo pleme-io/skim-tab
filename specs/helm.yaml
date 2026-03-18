@@ -1,0 +1,100 @@
+commands: [helm]
+icon: "\u2388 "
+subcommands:
+  install:
+    description: "Install a chart"
+    glyph: "\u25C7"
+  upgrade:
+    description: "Upgrade a release"
+    glyph: "\u25C7"
+  uninstall:
+    description: "Uninstall a release"
+    glyph: "\u25C7"
+  list:
+    description: "List releases"
+    glyph: "\u25C8"
+  ls:
+    description: "List releases"
+    glyph: "\u25C8"
+  status:
+    description: "Release status"
+    glyph: "\u25C8"
+  history:
+    description: "Release history"
+    glyph: "\u25C8"
+  rollback:
+    description: "Rollback to a revision"
+    glyph: "\u21BB"
+  template:
+    description: "Render templates locally"
+    glyph: "\u25B8"
+  show:
+    description: "Show chart information"
+    glyph: "\u25C8"
+  get:
+    description: "Get release details"
+    glyph: "\u25C8"
+  repo:
+    description: "Manage chart repos"
+    glyph: "\u2299"
+  search:
+    description: "Search for charts"
+    glyph: "\u25C8"
+  pull:
+    description: "Download a chart"
+    glyph: "\u25B8"
+  push:
+    description: "Push to a registry"
+    glyph: "\u25B8"
+  package:
+    description: "Package a chart"
+    glyph: "\u25B8"
+  create:
+    description: "Create a new chart"
+    glyph: "\u25C7"
+  lint:
+    description: "Lint a chart"
+    glyph: "\u25B8"
+  test:
+    description: "Test a release"
+    glyph: "\u25B8"
+  dependency:
+    description: "Manage dependencies"
+    glyph: "\u2299"
+  dep:
+    description: "Manage dependencies"
+    glyph: "\u2299"
+  env:
+    description: "Helm environment info"
+    glyph: "\u2299"
+  plugin:
+    description: "Manage plugins"
+    glyph: "\u2299"
+  registry:
+    description: "Registry operations"
+    glyph: "\u2299"
+  verify:
+    description: "Verify a signed chart"
+    glyph: "\u2299"
+  version:
+    description: "Client version"
+    glyph: "\u25C8"
+  completion:
+    description: "Shell completion"
+    glyph: "\u2299"
+  # show subcommands
+  chart:
+    description: "Chart metadata"
+    glyph: "\u25C8"
+  values:
+    description: "Chart default values"
+    glyph: "\u25C8"
+  readme:
+    description: "Chart README"
+    glyph: "\u25C8"
+  crds:
+    description: "Chart CRDs"
+    glyph: "\u25C8"
+  all:
+    description: "All chart info"
+    glyph: "\u25C8"

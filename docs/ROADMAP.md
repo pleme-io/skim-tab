@@ -27,7 +27,7 @@ What we have today:
 
 ## Round 2: Picker UX Enhancements
 
-**Goal**: Make the skim picker itself smarter and more pleasant.
+**Status: SHIPPED**
 
 ### 2a. Continuous completion trigger
 - **Config**: `picker.continuous_trigger: "/"`
@@ -124,30 +124,21 @@ What we have today:
 
 ## Round 5: Multi-Shell Foundation
 
-**Goal**: Decouple completion specs from zsh so they can be reused.
+**Status: SHIPPED**
 
 ### 5a. YAML completion specs
 - **Config**: `specs.enable: true`, `specs.dirs: ["~/.config/skim-tab/specs"]`
-- **What**: Define completion specs in YAML (like carapace). Ship with 50+
-  pre-built specs for common tools. Users can add custom specs.
-- **Format**:
-  ```yaml
-  command: docker
-  subcommands:
-    run:
-      flags:
-        --rm: "Remove container after exit"
-        -it: "Interactive TTY"
-      args:
-        - type: docker-image
-  ```
-- **Why**: Decouples from zsh's _complete system. Specs are portable,
-  version-controlled, and community-shareable.
+- [x] 12 built-in YAML specs compiled into binary (kubectl, helm, flux, docker,
+  git, nix, cargo, npm, terraform, aws, gcloud, az)
+- [x] User specs from `~/.config/skim-tab/specs/` override built-ins
+- [x] Project specs from `.skim-tab/specs/` override both
+- [x] `DescriptionProvider` trait abstracts lookup — `SpecRegistry` implements it
+- [x] `completion-forge` can auto-generate specs from OpenAPI specs
 
 ### 5b. Spec-based enrichment
-- **What**: When a YAML spec exists for the current command, use it for
-  descriptions, flag validation, and argument type hints instead of the
-  hardcoded Rust registry.
+- [x] YAML specs are the sole source of descriptions and icons
+- [x] Old hardcoded TOOL_REGISTRY fully removed
+- [x] `is_k8s_command()` explicit match prevents false K8s enrichment
 
 ---
 
@@ -188,17 +179,17 @@ What we have today:
 
 ## Implementation Priority
 
-| Round | Effort | Impact | Ship Target |
-|-------|--------|--------|-------------|
+| Round | Effort | Impact | Status |
+|-------|--------|--------|--------|
 | R1 Foundation | Done | High | Shipped |
-| R2a Continuous / | Medium | High | Next |
-| R2c Smart threshold | Small | Medium | Next |
-| R3a Dir preview | Small | Medium | Next |
-| R3b File preview | Small | Medium | Next |
-| R4b History-weighted | Medium | High | Soon |
-| R2b Group switching | Medium | Medium | Later |
+| R2 Picker UX | Done | High | Shipped |
+| R3a Dir preview | Done | Medium | Shipped |
+| R3b File preview | Done | Medium | Shipped |
+| R4b History-weighted | Done | High | Shipped |
+| R4c Frecency | Done | High | Shipped |
+| R5a YAML specs | Done | High | Shipped |
+| R5b Spec-based enrichment | Done | High | Shipped |
 | R3c K8s preview | Medium | Medium | Later |
 | R4a Project-aware | Medium | Medium | Later |
-| R5a YAML specs | Large | High | Future |
 | R6a Tmux popup | Medium | Medium | Future |
 | R6d Inline mode | Very Large | Very High | Future |
