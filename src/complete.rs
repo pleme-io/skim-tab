@@ -1490,4 +1490,177 @@ mod tests {
         );
         assert!(matches_key(&event, &(KeyCode::Char('x'), KeyModifiers::CONTROL)));
     }
+
+    // ── Midword completion tests ────────────────────────────────────
+
+    #[test]
+    fn parse_compcap_midword_prefix_and_suffix() {
+        // Simulates cursor in middle of "commit": "com|mit"
+        // PREFIX=com, SUFFIX=mit
+        let entry = b"commit\x02<\x00>\x00PREFIX\x00com\x00SUFFIX\x00mit\x00word\x00commit";
+        let req = parse_compcap(entry, "git", "^com", "git com");
+        assert_eq!(req.candidates.len(), 1);
+        let c = &req.candidates[0];
+        assert_eq!(c.word, "commit");
+        assert_eq!(c.prefix, "com");
+        assert_eq!(c.suffix, "mit");
+    }
+
+    #[test]
+    fn parse_compcap_midword_all_fields() {
+        // All 4 positional fields set (PREFIX, SUFFIX, IPREFIX, ISUFFIX)
+        let entry = b"word\x02<\x00>\x00PREFIX\x00pre\x00SUFFIX\x00suf\x00IPREFIX\x00ipre\x00ISUFFIX\x00isuf\x00word\x00word";
+        let req = parse_compcap(entry, "cmd", "", "");
+        let c = &req.candidates[0];
+        assert_eq!(c.prefix, "pre");
+        assert_eq!(c.suffix, "suf");
+        assert_eq!(c.iprefix, "ipre");
+        assert_eq!(c.isuffix, "isuf");
+    }
+
+    #[test]
+    fn parse_compcap_midword_empty_suffix() {
+        // Cursor at end of word — SUFFIX should be empty
+        let entry = b"commit\x02<\x00>\x00PREFIX\x00commit\x00word\x00commit";
+        let req = parse_compcap(entry, "git", "", "");
+        let c = &req.candidates[0];
+        assert_eq!(c.prefix, "commit");
+        assert_eq!(c.suffix, ""); // no SUFFIX key → empty
+    }
+
+    #[test]
+    fn candidate_to_selection_preserves_suffix() {
+        let c = Candidate {
+            word: "commit".into(),
+            prefix: "com".into(),
+            suffix: "mit".into(),
+            iprefix: "insert-".into(),
+            isuffix: "-end".into(),
+            args: "-Q\x01-f".into(),
+            ..Default::default()
+        };
+        let cfg = config::CompletionConfig::default();
+        let sel = c.to_selection_with_config(&cfg);
+        assert_eq!(sel.word, "commit");
+        assert_eq!(sel.prefix, "com");
+        assert_eq!(sel.suffix, "mit");
+        assert_eq!(sel.iprefix, "insert-");
+        assert_eq!(sel.isuffix, "-end");
+        assert_eq!(sel.args, "-Q\x01-f");
+        assert!(!sel.is_dir);
+    }
+
+    #[test]
+    fn eval_response_format_has_8_fields() {
+        let sel = Selection {
+            word: "commit".into(),
+            prefix: "com".into(),
+            suffix: "mit".into(),
+            iprefix: "".into(),
+            isuffix: "".into(),
+            args: "-Q".into(),
+            is_dir: false,
+        };
+        let dir_flag = if sel.is_dir { "d" } else { "" };
+        let exec_flag = "";
+        let line = format!(
+            "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
+            sel.word, sel.prefix, sel.suffix,
+            sel.iprefix, sel.isuffix, sel.args,
+            dir_flag, exec_flag
+        );
+        let fields: Vec<&str> = line.split('\x1f').collect();
+        assert_eq!(fields.len(), 8, "eval response must have exactly 8 fields");
+        assert_eq!(fields[0], "commit");
+        assert_eq!(fields[1], "com");   // PREFIX
+        assert_eq!(fields[2], "mit");   // SUFFIX — critical for midword
+        assert_eq!(fields[3], "");      // IPREFIX
+        assert_eq!(fields[4], "");      // ISUFFIX
+        assert_eq!(fields[5], "-Q");    // args
+        assert_eq!(fields[6], "");      // dir_flag
+        assert_eq!(fields[7], "");      // exec_flag
+    }
+
+    #[test]
+    fn eval_response_dir_flag_set() {
+        let sel = Selection {
+            word: "scripts/".into(),
+            prefix: "scr".into(),
+            suffix: "ipts".into(),
+            iprefix: "".into(),
+            isuffix: "".into(),
+            args: "".into(),
+            is_dir: true,
+        };
+        let dir_flag = if sel.is_dir { "d" } else { "" };
+        let line = format!(
+            "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f",
+            sel.word, sel.prefix, sel.suffix,
+            sel.iprefix, sel.isuffix, sel.args, dir_flag
+        );
+        let fields: Vec<&str> = line.split('\x1f').collect();
+        assert_eq!(fields[6], "d");
+        assert_eq!(fields[2], "ipts"); // SUFFIX preserved even for dirs
+    }
+
+    #[test]
+    fn parse_compcap_roundtrip_midword() {
+        // Full roundtrip: parse compcap → candidate → selection → eval format
+        let entry = b"screenshot\x02<\x00>\x00PREFIX\x00scr\x00SUFFIX\x00ipt.sh\x00word\x00screenshot";
+        let req = parse_compcap(entry, "vim", "^scr", "vim scr");
+        let c = &req.candidates[0];
+        assert_eq!(c.prefix, "scr");
+        assert_eq!(c.suffix, "ipt.sh");
+
+        let cfg = config::CompletionConfig::default();
+        let sel = c.to_selection_with_config(&cfg);
+        assert_eq!(sel.suffix, "ipt.sh");
+
+        // Verify eval output preserves suffix
+        let dir_flag = if sel.is_dir { "d" } else { "" };
+        let line = format!(
+            "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f",
+            sel.word, sel.prefix, sel.suffix,
+            sel.iprefix, sel.isuffix, sel.args, dir_flag
+        );
+        let fields: Vec<&str> = line.split('\x1f').collect();
+        assert_eq!(fields[0], "screenshot"); // word
+        assert_eq!(fields[1], "scr");        // prefix
+        assert_eq!(fields[2], "ipt.sh");     // suffix preserved through pipeline
+    }
+
+    #[test]
+    fn parse_compcap_midword_with_args_and_suffix() {
+        // Complex case: midword + zparseopts args
+        let entry = b"target\x02<\x00>\x00PREFIX\x00tar\x00SUFFIX\x00get\x00args\x00-P\x01./\x01-f\x00word\x00target";
+        let req = parse_compcap(entry, "ls", "", "");
+        let c = &req.candidates[0];
+        assert_eq!(c.prefix, "tar");
+        assert_eq!(c.suffix, "get");
+        assert_eq!(c.args, "-P\x01./\x01-f");
+    }
+
+    #[test]
+    fn multiple_selections_preserve_suffix() {
+        // When multiple candidates are selected, each should preserve its own suffix
+        let c1 = Candidate {
+            word: "commit".into(),
+            prefix: "com".into(),
+            suffix: "mit".into(),
+            ..Default::default()
+        };
+        let c2 = Candidate {
+            word: "compare".into(),
+            prefix: "com".into(),
+            suffix: "mit".into(), // same suffix context
+            ..Default::default()
+        };
+        let cfg = config::CompletionConfig::default();
+        let s1 = c1.to_selection_with_config(&cfg);
+        let s2 = c2.to_selection_with_config(&cfg);
+        assert_eq!(s1.suffix, "mit");
+        assert_eq!(s2.suffix, "mit");
+        // Both selections carry the suffix through
+        assert_ne!(s1.word, s2.word); // but different words
+    }
 }
