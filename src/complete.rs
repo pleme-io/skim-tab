@@ -1663,4 +1663,112 @@ mod tests {
         // Both selections carry the suffix through
         assert_ne!(s1.word, s2.word); // but different words
     }
+
+    // ── Cursor position edge cases ──────────────────────────────────
+
+    #[test]
+    fn parse_compcap_cursor_at_word_start() {
+        // Cursor at start of word: "|commit" → PREFIX="", SUFFIX="commit"
+        let entry = b"commit\x02<\x00>\x00SUFFIX\x00commit\x00word\x00commit";
+        let req = parse_compcap(entry, "git", "", "git ");
+        let c = &req.candidates[0];
+        assert_eq!(c.word, "commit");
+        assert_eq!(c.prefix, "");      // empty — cursor at start
+        assert_eq!(c.suffix, "commit"); // entire word is suffix
+    }
+
+    #[test]
+    fn parse_compcap_hyphenated_midword() {
+        // "kubectl --name|space" → PREFIX="--name", SUFFIX="space"
+        let entry = b"--namespace\x02<\x00>\x00PREFIX\x00--name\x00SUFFIX\x00space\x00word\x00--namespace";
+        let req = parse_compcap(entry, "kubectl", "^--name", "kubectl --name");
+        let c = &req.candidates[0];
+        assert_eq!(c.word, "--namespace");
+        assert_eq!(c.prefix, "--name");
+        assert_eq!(c.suffix, "space");
+    }
+
+    #[test]
+    fn parse_compcap_path_midword() {
+        // "cd ~/co|de/github" → PREFIX="co", SUFFIX="de", IPREFIX="~/"
+        let entry = b"code\x02<\x00>\x00PREFIX\x00co\x00SUFFIX\x00de\x00IPREFIX\x00~/\x00word\x00code";
+        let req = parse_compcap(entry, "cd", "^co", "cd ~/co");
+        let c = &req.candidates[0];
+        assert_eq!(c.prefix, "co");
+        assert_eq!(c.suffix, "de");
+        assert_eq!(c.iprefix, "~/");
+    }
+
+    #[test]
+    fn candidate_to_selection_cursor_at_start() {
+        // Empty prefix, full word as suffix
+        let c = Candidate {
+            word: "commit".into(),
+            prefix: "".into(),
+            suffix: "commit".into(),
+            ..Default::default()
+        };
+        let cfg = config::CompletionConfig::default();
+        let sel = c.to_selection_with_config(&cfg);
+        assert_eq!(sel.prefix, "");
+        assert_eq!(sel.suffix, "commit");
+    }
+
+    #[test]
+    fn eval_response_empty_prefix_nonempty_suffix() {
+        // Cursor at word start: fields[1] (prefix) empty, fields[2] (suffix) full
+        let sel = Selection {
+            word: "commit".into(),
+            prefix: "".into(),
+            suffix: "commit".into(),
+            iprefix: "".into(),
+            isuffix: "".into(),
+            args: "".into(),
+            is_dir: false,
+        };
+        let line = format!(
+            "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
+            sel.word, sel.prefix, sel.suffix,
+            sel.iprefix, sel.isuffix, sel.args, "", ""
+        );
+        let fields: Vec<&str> = line.split('\x1f').collect();
+        assert_eq!(fields[0], "commit");
+        assert_eq!(fields[1], "");       // PREFIX empty
+        assert_eq!(fields[2], "commit"); // SUFFIX is the full word
+    }
+
+    #[test]
+    fn parse_compcap_equals_sign_in_suffix() {
+        // "kubectl --namespace=def|ault" → SUFFIX="ault"
+        let entry = b"default\x02<\x00>\x00PREFIX\x00def\x00SUFFIX\x00ault\x00word\x00default";
+        let req = parse_compcap(entry, "kubectl", "^def", "kubectl --namespace=def");
+        let c = &req.candidates[0];
+        assert_eq!(c.prefix, "def");
+        assert_eq!(c.suffix, "ault");
+    }
+
+    #[test]
+    fn roundtrip_cursor_at_start() {
+        // Full roundtrip with cursor at word start
+        let entry = b"screenshot\x02<\x00>\x00SUFFIX\x00screenshot\x00word\x00screenshot";
+        let req = parse_compcap(entry, "vim", "", "vim ");
+        let c = &req.candidates[0];
+        assert_eq!(c.prefix, "");
+        assert_eq!(c.suffix, "screenshot");
+
+        let cfg = config::CompletionConfig::default();
+        let sel = c.to_selection_with_config(&cfg);
+        assert_eq!(sel.suffix, "screenshot");
+
+        let line = format!(
+            "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f",
+            sel.word, sel.prefix, sel.suffix,
+            sel.iprefix, sel.isuffix, sel.args,
+            if sel.is_dir { "d" } else { "" }
+        );
+        let fields: Vec<&str> = line.split('\x1f').collect();
+        assert_eq!(fields[0], "screenshot");
+        assert_eq!(fields[1], "");           // empty prefix
+        assert_eq!(fields[2], "screenshot"); // full word as suffix
+    }
 }
