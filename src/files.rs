@@ -6,42 +6,13 @@
 
 use std::env;
 use std::io;
-use std::process::Command;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
 use skim::Skim;
-use skim_tab::{base_options, build_options, parse_query, shell_quote, ICON_FILES, ICON_MARKER};
-
-/// Run fd to discover files and directories.
-fn discover_files() -> Result<String> {
-    let output = Command::new("fd")
-        .args([
-            "--type",
-            "f",
-            "--type",
-            "d",
-            "--hidden",
-            "--follow",
-            "--exclude",
-            ".git",
-            "--exclude",
-            "node_modules",
-            "--exclude",
-            "target",
-            "--exclude",
-            "__pycache__",
-            "--exclude",
-            ".direnv",
-            "--strip-cwd-prefix",
-        ])
-        .output()
-        .context("failed to run fd — is it installed?")?;
-
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-}
+use skim_tab::{base_options, build_options, fd_discover, parse_query, shell_quote, FdTarget, ICON_FILES, ICON_MARKER};
 
 /// Preview command: directories get eza tree, files get bat.
 fn preview_command() -> String {
@@ -57,7 +28,7 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
     let query = parse_query(&args);
 
-    let entries = discover_files()?;
+    let entries = fd_discover(FdTarget::FilesAndDirs)?;
     if entries.is_empty() {
         return Ok(());
     }

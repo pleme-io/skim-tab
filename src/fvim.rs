@@ -11,36 +11,10 @@ use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
 use skim::Skim;
-use skim_tab::{base_options, build_options, editor, ICON_FILES};
-
-/// Run fd to discover files only.
-fn discover_files() -> Result<String> {
-    let output = Command::new("fd")
-        .args([
-            "--type",
-            "f",
-            "--hidden",
-            "--follow",
-            "--exclude",
-            ".git",
-            "--exclude",
-            "node_modules",
-            "--exclude",
-            "target",
-            "--exclude",
-            "__pycache__",
-            "--exclude",
-            ".direnv",
-            "--strip-cwd-prefix",
-        ])
-        .output()
-        .context("failed to run fd — is it installed?")?;
-
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-}
+use skim_tab::{base_options, build_options, editor, fd_discover, FdTarget, ICON_FILES};
 
 fn main() -> Result<()> {
-    let entries = discover_files()?;
+    let entries = fd_discover(FdTarget::Files)?;
     if entries.is_empty() {
         return Ok(());
     }
@@ -82,7 +56,6 @@ mod tests {
 
     #[test]
     fn discover_files_runs() {
-        // Just verify it doesn't panic — fd may or may not be in PATH in CI
-        let _ = discover_files();
+        let _ = fd_discover(FdTarget::Files);
     }
 }
