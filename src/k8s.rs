@@ -39,6 +39,7 @@ struct ContextData {
 /// Abstraction over kubeconfig loading for testability.
 /// Returns an `Option<KubeContext>` directly since `KubeConfig` is private.
 pub trait KubeconfigLoader: Send + Sync {
+    /// Load and parse the current kubeconfig, returning the active context.
     fn load(&self) -> Option<KubeContext>;
 }
 
@@ -82,6 +83,7 @@ fn kube_context_from_config(config: &KubeConfig) -> Option<KubeContext> {
 
 /// Abstraction over kubectl subprocess calls for testability.
 pub trait KubectlRunner: Send + Sync {
+    /// Execute `kubectl` with the given arguments, returning stdout on success.
     fn run(&self, args: &[&str]) -> Option<String>;
 }
 
@@ -108,8 +110,11 @@ impl KubectlRunner for RealKubectlRunner {
 
 /// Parsed kubeconfig — the active context, namespace, and cluster.
 pub struct KubeContext {
+    /// Active kubectl context name (e.g. `"prod-us-east-1"`).
     pub context: String,
+    /// Active namespace within the context (defaults to `"default"`).
     pub namespace: String,
+    /// Cluster name from the kubeconfig context entry.
     pub cluster: String,
 }
 
