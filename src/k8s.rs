@@ -537,4 +537,202 @@ contexts:
         let counts = namespace_pod_counts_with(&runner);
         assert!(counts.is_empty());
     }
+
+    // ── parse_resource_counts edge cases ─────────────────────────────
+
+    #[test]
+    fn parse_resource_counts_empty() {
+        let counts = parse_resource_counts("");
+        assert!(counts.is_empty());
+    }
+
+    #[test]
+    fn parse_resource_counts_trailing_newline() {
+        let counts = parse_resource_counts("pod/nginx\npod/redis\n");
+        assert_eq!(counts.get("pods"), Some(&2));
+    }
+
+    #[test]
+    fn parse_resource_counts_mixed_types() {
+        let input = "pod/a\nservice/b\npod/c\ndeployment.apps/d\n";
+        let counts = parse_resource_counts(input);
+        assert_eq!(counts.get("pods"), Some(&2));
+        assert_eq!(counts.get("services"), Some(&1));
+        assert_eq!(counts.get("deployments"), Some(&1));
+    }
+
+    #[test]
+    fn parse_resource_counts_no_slash_in_line() {
+        // Lines without / should use the full line as the type
+        let counts = parse_resource_counts("standalone\n");
+        assert_eq!(counts.get("standalones"), Some(&1));
+    }
+
+    // ── parse_namespace_pod_counts edge cases ────────────────────────
+
+    #[test]
+    fn parse_namespace_pod_counts_empty() {
+        let counts = parse_namespace_pod_counts("");
+        assert!(counts.is_empty());
+    }
+
+    #[test]
+    fn parse_namespace_pod_counts_whitespace_lines() {
+        let counts = parse_namespace_pod_counts("  default  \n  kube-system  \n   \n");
+        assert_eq!(counts.get("default"), Some(&1));
+        assert_eq!(counts.get("kube-system"), Some(&1));
+        assert!(!counts.contains_key(""));
+    }
+
+    #[test]
+    fn parse_namespace_pod_counts_single_ns() {
+        let counts = parse_namespace_pod_counts("myns\nmyns\nmyns\n");
+        assert_eq!(counts.get("myns"), Some(&3));
+    }
+
+    // ── api_type_to_plural comprehensive ─────────────────────────────
+
+    #[test]
+    fn api_type_to_plural_all_known_types() {
+        let known = vec![
+            ("configmap", "configmaps"),
+            ("secret", "secrets"),
+            ("namespace", "namespaces"),
+            ("node", "nodes"),
+            ("persistentvolumeclaim", "persistentvolumeclaims"),
+            ("persistentvolume", "persistentvolumes"),
+            ("serviceaccount", "serviceaccounts"),
+            ("role", "roles"),
+            ("clusterrole", "clusterroles"),
+            ("rolebinding", "rolebindings"),
+            ("clusterrolebinding", "clusterrolebindings"),
+            ("networkpolicy", "networkpolicies"),
+            ("storageclass", "storageclasses"),
+            ("event", "events"),
+            ("endpoints", "endpoints"),
+            ("horizontalpodautoscaler", "horizontalpodautoscalers"),
+            ("poddisruptionbudget", "poddisruptionbudgets"),
+            ("limitrange", "limitranges"),
+            ("resourcequota", "resourcequotas"),
+            ("customresourcedefinition", "customresourcedefinitions"),
+            ("replicaset", "replicasets"),
+            ("statefulset", "statefulsets"),
+            ("daemonset", "daemonsets"),
+            ("job", "jobs"),
+            ("cronjob", "cronjobs"),
+        ];
+        for (input, expected) in known {
+            assert_eq!(
+                api_type_to_plural(input).as_ref(),
+                expected,
+                "failed for input: {input}"
+            );
+        }
+    }
+
+    #[test]
+    fn api_type_to_plural_with_api_group_suffix() {
+        assert_eq!(api_type_to_plural("statefulset.apps"), "statefulsets");
+        assert_eq!(api_type_to_plural("job.batch"), "jobs");
+        assert_eq!(api_type_to_plural("ingress.networking.k8s.io"), "ingresses");
+    }
+
+    // ── KubeContext header edge cases ────────────────────────────────
+
+    #[test]
+    fn kube_context_header_empty_cluster() {
+        let ctx = KubeContext {
+            context: "dev".to_string(),
+            namespace: "default".to_string(),
+            cluster: "".to_string(),
+        };
+        let header = ctx.header();
+        let plain = crate::strip_ansi(&header);
+        assert!(plain.contains("ctx: dev"));
+        assert!(plain.contains("ns: default"));
+        assert!(!plain.contains("cluster:"));
+    }
+
+    #[test]
+    fn kube_context_prompt_empty_context() {
+        let ctx = KubeContext {
+            context: "".to_string(),
+            namespace: "default".to_string(),
+            cluster: "".to_string(),
+        };
+        let prompt = ctx.prompt();
+        assert!(prompt.contains(crate::ICON_K8S));
+    }
+
+    #[test]
+    fn kube_context_prompt_exactly_15_chars() {
+        let ctx = KubeContext {
+            context: "012345678901234".to_string(), // exactly 15 chars
+            namespace: "default".to_string(),
+            cluster: "".to_string(),
+        };
+        let prompt = ctx.prompt();
+        assert!(prompt.contains("012345678901234"));
+    }
+
+    // ── MockKubeconfigLoader edge cases ──────────────────────────────
+
+    #[test]
+    fn mock_loader_invalid_yaml() {
+        let loader = MockKubeconfigLoader {
+            yaml: "{{invalid".to_string(),
+        };
+        assert!(KubeContext::with_loader(&loader).is_none());
+    }
+
+    #[test]
+    fn mock_loader_no_matching_context() {
+        let loader = MockKubeconfigLoader {
+            yaml: r#"
+apiVersion: v1
+kind: Config
+current-context: nonexistent
+contexts:
+  - name: actual
+    context:
+      cluster: cluster1
+"#.to_string(),
+        };
+        assert!(KubeContext::with_loader(&loader).is_none());
+    }
+
+    #[test]
+    fn mock_loader_empty_contexts() {
+        let loader = MockKubeconfigLoader {
+            yaml: r#"
+apiVersion: v1
+kind: Config
+current-context: test
+contexts: []
+"#.to_string(),
+        };
+        assert!(KubeContext::with_loader(&loader).is_none());
+    }
+
+    // ── resource_counts_with namespace param ─────────────────────────
+
+    #[test]
+    fn resource_counts_with_namespace() {
+        let runner = MockKubectlRunner {
+            output: Some("pod/nginx\n".to_string()),
+        };
+        let counts = resource_counts_with(&runner, &["pods"], Some("myns"));
+        assert_eq!(counts.get("pods"), Some(&1));
+    }
+
+    // ── kubeconfig_paths ─────────────────────────────────────────────
+
+    #[test]
+    fn kubeconfig_paths_single() {
+        std::env::set_var("KUBECONFIG", "/tmp/single");
+        let paths = kubeconfig_paths();
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0], PathBuf::from("/tmp/single"));
+        std::env::remove_var("KUBECONFIG");
+    }
 }

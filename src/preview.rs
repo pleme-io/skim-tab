@@ -873,4 +873,255 @@ mod tests {
             _ => panic!("expected Directory for /tmp"),
         }
     }
+
+    // ── human_size boundary cases ────────────────────────────────────
+
+    #[test]
+    fn human_size_zero() {
+        assert_eq!(human_size(0), "0 B");
+    }
+
+    #[test]
+    fn human_size_exact_kb() {
+        assert_eq!(human_size(1024), "1.0 KB");
+    }
+
+    #[test]
+    fn human_size_exact_mb() {
+        assert_eq!(human_size(1024 * 1024), "1.0 MB");
+    }
+
+    #[test]
+    fn human_size_exact_gb() {
+        assert_eq!(human_size(1024 * 1024 * 1024), "1.0 GB");
+    }
+
+    #[test]
+    fn human_size_one_byte() {
+        assert_eq!(human_size(1), "1 B");
+    }
+
+    #[test]
+    fn human_size_just_below_kb() {
+        assert_eq!(human_size(1023), "1023 B");
+    }
+
+    // ── find_flag edge cases ─────────────────────────────────────────
+
+    #[test]
+    fn find_flag_at_end_of_args() {
+        let words = vec!["kubectl", "-n"];
+        // -n at end with no following value
+        assert_eq!(find_flag(&words, &["-n"]), None);
+    }
+
+    #[test]
+    fn find_flag_empty_words() {
+        let words: Vec<&str> = vec![];
+        assert_eq!(find_flag(&words, &["-n"]), None);
+    }
+
+    #[test]
+    fn find_flag_equals_empty_value() {
+        let words = vec!["kubectl", "--namespace=", "get"];
+        let result = find_flag(&words, &["--namespace"]);
+        assert_eq!(result, Some(""));
+    }
+
+    #[test]
+    fn find_flag_prefers_first_occurrence() {
+        let words = vec!["kubectl", "-n", "first", "-n", "second"];
+        assert_eq!(find_flag(&words, &["-n"]), Some("first"));
+    }
+
+    // ── BufferContext edge cases ─────────────────────────────────────
+
+    #[test]
+    fn buffer_context_multiple_flags_with_values() {
+        let ctx = BufferContext::parse("kubectl -n prod -o json get pods", "");
+        assert_eq!(ctx.namespace, Some("prod"));
+        assert_eq!(ctx.subcmds, vec!["get", "pods"]);
+    }
+
+    #[test]
+    fn buffer_context_flag_with_equals() {
+        let ctx = BufferContext::parse("kubectl --output=yaml get pods", "");
+        assert_eq!(ctx.subcmds, vec!["get", "pods"]);
+    }
+
+    #[test]
+    fn buffer_context_only_flags() {
+        let ctx = BufferContext::parse("kubectl --help --version", "");
+        assert!(ctx.subcmds.is_empty());
+    }
+
+    #[test]
+    fn buffer_context_single_word() {
+        let ctx = BufferContext::parse("kubectl", "");
+        assert_eq!(ctx.base_cmd, "kubectl");
+        assert!(ctx.subcmds.is_empty());
+    }
+
+    // ── detect_preview_type edge cases ───────────────────────────────
+
+    #[test]
+    fn detect_ps_as_process() {
+        match detect_preview_type("ps", "", "1234", "") {
+            PreviewType::Process(pid) => assert_eq!(pid, "1234"),
+            _ => panic!("expected Process"),
+        }
+    }
+
+    #[test]
+    fn detect_k_as_k8s() {
+        match detect_preview_type("k", "k get pods", "nginx", "") {
+            PreviewType::K8sResource { _tool, .. } => assert_eq!(_tool, "k"),
+            _ => panic!("expected K8sResource"),
+        }
+    }
+
+    #[test]
+    fn detect_helm_as_k8s() {
+        match detect_preview_type("helm", "helm status", "release", "") {
+            PreviewType::K8sResource { _tool, .. } => assert_eq!(_tool, "helm"),
+            _ => panic!("expected K8sResource"),
+        }
+    }
+
+    #[test]
+    fn detect_flux_as_k8s() {
+        match detect_preview_type("flux", "flux get", "ks", "") {
+            PreviewType::K8sResource { _tool, .. } => assert_eq!(_tool, "flux"),
+            _ => panic!("expected K8sResource"),
+        }
+    }
+
+    #[test]
+    fn detect_kubecolor_as_k8s() {
+        match detect_preview_type("kubecolor", "kubecolor get", "pods", "") {
+            PreviewType::K8sResource { _tool, .. } => assert_eq!(_tool, "kubecolor"),
+            _ => panic!("expected K8sResource"),
+        }
+    }
+
+    #[test]
+    fn detect_git_reset_as_file() {
+        match detect_preview_type("git-reset", "git reset", "file.rs", "") {
+            PreviewType::GitFile(path) => assert_eq!(path, "file.rs"),
+            _ => panic!("expected GitFile"),
+        }
+    }
+
+    #[test]
+    fn detect_git_stash_as_file() {
+        match detect_preview_type("git-stash", "git stash", "file.rs", "") {
+            PreviewType::GitFile(path) => assert_eq!(path, "file.rs"),
+            _ => panic!("expected GitFile"),
+        }
+    }
+
+    #[test]
+    fn detect_file_preview() {
+        match detect_preview_type("", "", "Cargo.toml", "") {
+            PreviewType::File(p) => assert_eq!(p, "Cargo.toml"),
+            _ => panic!("expected File for Cargo.toml"),
+        }
+    }
+
+    #[test]
+    fn detect_preview_with_realdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("test.txt");
+        std::fs::write(&file_path, "content").unwrap();
+        let realdir = format!("{}/", dir.path().display());
+        match detect_preview_type("", "", "test.txt", &realdir) {
+            PreviewType::File(p) => assert!(p.ends_with("test.txt")),
+            _ => panic!("expected File with realdir"),
+        }
+    }
+
+    // ── is_binary_file / is_image_file ───────────────────────────────
+
+    #[test]
+    fn is_image_file_case_insensitive() {
+        assert!(is_image_file("photo.PNG"));
+        assert!(is_image_file("photo.Jpg"));
+        assert!(is_image_file("photo.JPEG"));
+    }
+
+    #[test]
+    fn is_image_file_no_extension() {
+        assert!(!is_image_file("Makefile"));
+        assert!(!is_image_file(""));
+    }
+
+    // ── with_ns helper ───────────────────────────────────────────────
+
+    #[test]
+    fn with_ns_single_arg() {
+        assert_eq!(with_ns(&["get"], &["-n", "ns"]), vec!["get", "-n", "ns"]);
+    }
+
+    #[test]
+    fn with_ns_preserves_order() {
+        let result = with_ns(&["a", "b", "c"], &["x", "y"]);
+        assert_eq!(result, vec!["a", "b", "c", "x", "y"]);
+    }
+
+    // ── preview_dir output format ────────────────────────────────────
+
+    #[test]
+    fn preview_dir_empty_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = preview_dir(dir.path().to_str().unwrap(), 10);
+        assert!(output.contains("0 entries"));
+    }
+
+    #[test]
+    fn preview_dir_respects_max_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        for i in 0..20 {
+            std::fs::write(dir.path().join(format!("file{i:02}")), "").unwrap();
+        }
+        let output = preview_dir(dir.path().to_str().unwrap(), 5);
+        let body_lines = output.lines().skip(2).count(); // skip header + blank
+        assert!(body_lines <= 5);
+    }
+
+    // ── preview_text_file ────────────────────────────────────────────
+
+    #[test]
+    fn preview_text_file_nonexistent() {
+        let output = preview_text_file("/tmp/nonexistent-skim-tab-test-file-xyz", 10);
+        // Should not panic, may be empty
+        let _ = output;
+    }
+
+    // ── git curcontext dispatch ───────────────────────────────────────
+
+    #[test]
+    fn detect_git_via_buffer_not_command() {
+        // When command is "git" (not git-checkout), buffer drives dispatch
+        match detect_preview_type("git", "git checkout", "main", "") {
+            PreviewType::GitBranch(name) => assert_eq!(name, "main"),
+            _ => panic!("expected GitBranch via buffer parsing"),
+        }
+    }
+
+    #[test]
+    fn detect_git_add_via_buffer() {
+        match detect_preview_type("git", "git add", "src/main.rs", "") {
+            PreviewType::GitFile(path) => assert_eq!(path, "src/main.rs"),
+            _ => panic!("expected GitFile via buffer parsing"),
+        }
+    }
+
+    #[test]
+    fn detect_non_git_command_with_git_prefix() {
+        // "git-like" command that isn't actually git
+        match detect_preview_type("gitbub", "gitbub push", "main", "") {
+            PreviewType::Generic(text) => assert_eq!(text, "main"),
+            _ => panic!("expected Generic for non-git command"),
+        }
+    }
 }

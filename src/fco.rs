@@ -75,8 +75,27 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn icon_is_valid() {
-        assert!(!super::ICON_GIT.is_empty());
+        assert!(!ICON_GIT.is_empty());
+    }
+
+    #[test]
+    fn icon_has_trailing_space() {
+        assert!(ICON_GIT.ends_with(' '));
+    }
+
+    #[test]
+    fn git_branches_in_repo() {
+        // We're in a git repo, so this should succeed
+        let result = git_branches();
+        assert!(result.is_ok());
+        let branches = result.unwrap();
+        // Should have at least one branch (main/master)
+        assert!(!branches.is_empty());
+        // HEAD should be filtered out
+        assert!(!branches.contains("HEAD"));
     }
 }

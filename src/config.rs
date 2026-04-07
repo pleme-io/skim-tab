@@ -551,8 +551,156 @@ completion:
         let cfg: Config = serde_yaml::from_str(yaml).unwrap();
         assert!(cfg.completion.picker.continuous_trigger.is_empty());
         assert_eq!(cfg.completion.picker.accept_execute_key, "ctrl-x");
-        // Other defaults preserved
         assert!(cfg.completion.picker.cycle);
         assert_eq!(cfg.completion.picker.min_candidates, 2);
+    }
+
+    // ── CompletionMode exhaustive ────────────────────────────────────
+
+    #[test]
+    fn direct_mode_properties() {
+        assert!(CompletionMode::Direct.use_direct());
+        assert!(!CompletionMode::Direct.use_service());
+    }
+
+    #[test]
+    fn completion_mode_serialization_roundtrip() {
+        for mode_str in ["direct", "service", "hybrid"] {
+            let yaml = format!("completion:\n  mode: {mode_str}\n");
+            let cfg: Config = serde_yaml::from_str(&yaml).unwrap();
+            let serialized = serde_yaml::to_string(&cfg).unwrap();
+            assert!(serialized.contains(mode_str));
+        }
+    }
+
+    // ── Default values for all nested configs ────────────────────────
+
+    #[test]
+    fn preview_config_defaults() {
+        let cfg = PreviewConfig::default();
+        assert!(cfg.enable);
+        assert!(cfg.directories);
+        assert!(cfg.files);
+        assert_eq!(cfg.max_lines, 20);
+        assert_eq!(cfg.layout, "right:50%:wrap");
+    }
+
+    #[test]
+    fn service_config_defaults() {
+        let cfg = ServiceConfig::default();
+        assert_eq!(cfg.endpoint, "http://127.0.0.1:50051");
+        assert_eq!(cfg.timeout_ms, 200);
+    }
+
+    #[test]
+    fn specs_config_defaults() {
+        let cfg = SpecsConfig::default();
+        assert!(cfg.enable);
+        assert!(cfg.project_specs);
+        assert!(!cfg.dirs.is_empty());
+        assert!(cfg.dirs[0].contains("skim-tab"));
+    }
+
+    #[test]
+    fn enrichment_config_defaults() {
+        let cfg = EnrichmentConfig::default();
+        assert!(cfg.lscolors);
+        assert!(cfg.descriptions);
+        assert!(cfg.k8s_live);
+        assert!(cfg.project_detection);
+        assert!(!cfg.history_boost);
+        assert!(!cfg.frecency);
+    }
+
+    #[test]
+    fn dir_handling_config_defaults() {
+        let cfg = DirHandlingConfig::default();
+        assert!(cfg.append_slash);
+        assert!(cfg.skip_trailing_space);
+    }
+
+    #[test]
+    fn direct_config_defaults() {
+        let cfg = DirectConfig::default();
+        assert!(cfg.k8s_enrichment);
+    }
+
+    // ── Deserialize enrichment fields ────────────────────────────────
+
+    #[test]
+    fn deserialize_enrichment_all_flags() {
+        let yaml = r#"
+completion:
+  enrichment:
+    lscolors: false
+    descriptions: false
+    k8s_live: false
+    project_detection: false
+    history_boost: true
+    frecency: true
+"#;
+        let cfg: Config = serde_yaml::from_str(yaml).unwrap();
+        assert!(!cfg.completion.enrichment.lscolors);
+        assert!(!cfg.completion.enrichment.descriptions);
+        assert!(!cfg.completion.enrichment.k8s_live);
+        assert!(!cfg.completion.enrichment.project_detection);
+        assert!(cfg.completion.enrichment.history_boost);
+        assert!(cfg.completion.enrichment.frecency);
+    }
+
+    // ── Deserialize specs config ─────────────────────────────────────
+
+    #[test]
+    fn deserialize_specs_config() {
+        let yaml = r#"
+completion:
+  specs:
+    enable: false
+    dirs: ["/custom/specs"]
+    project_specs: false
+"#;
+        let cfg: Config = serde_yaml::from_str(yaml).unwrap();
+        assert!(!cfg.completion.specs.enable);
+        assert_eq!(cfg.completion.specs.dirs, vec!["/custom/specs"]);
+        assert!(!cfg.completion.specs.project_specs);
+    }
+
+    // ── Deserialize preview layout ───────────────────────────────────
+
+    #[test]
+    fn deserialize_preview_config() {
+        let yaml = r#"
+completion:
+  preview:
+    enable: false
+    directories: false
+    files: false
+    max_lines: 100
+    layout: "down:30%"
+"#;
+        let cfg: Config = serde_yaml::from_str(yaml).unwrap();
+        assert!(!cfg.completion.preview.enable);
+        assert!(!cfg.completion.preview.directories);
+        assert!(!cfg.completion.preview.files);
+        assert_eq!(cfg.completion.preview.max_lines, 100);
+        assert_eq!(cfg.completion.preview.layout, "down:30%");
+    }
+
+    // ── Empty YAML deserializes to defaults ──────────────────────────
+
+    #[test]
+    fn empty_yaml_uses_defaults() {
+        let cfg: Config = serde_yaml::from_str("{}").unwrap();
+        assert_eq!(cfg.completion.mode, CompletionMode::Direct);
+        assert!(cfg.completion.single_auto_select);
+    }
+
+    // ── Invalid mode should fail ─────────────────────────────────────
+
+    #[test]
+    fn deserialize_invalid_mode_fails() {
+        let yaml = "completion:\n  mode: invalid_mode\n";
+        let result = serde_yaml::from_str::<Config>(yaml);
+        assert!(result.is_err());
     }
 }

@@ -83,4 +83,22 @@ mod tests {
         assert!(result.is_ok());
         assert!(!result.unwrap().is_empty());
     }
+
+    #[test]
+    fn process_list_skips_header() {
+        let result = process_list().unwrap();
+        // The header line (PID USER ...) should be stripped
+        assert!(!result.starts_with("PID") && !result.starts_with("  PID"));
+    }
+
+    #[test]
+    fn process_list_contains_current_process() {
+        let result = process_list().unwrap();
+        let current_pid = std::process::id().to_string();
+        // Our own process should appear in the list
+        assert!(
+            result.contains(&current_pid),
+            "process list should contain current PID {current_pid}"
+        );
+    }
 }

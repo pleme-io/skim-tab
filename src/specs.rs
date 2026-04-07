@@ -546,4 +546,214 @@ mod tests {
         assert_eq!(DescriptionProvider::icon(&mock, "test-cmd"), Some("T "));
         assert!(DescriptionProvider::icon(&mock, "other").is_none());
     }
+
+    // ── Spec priority (later specs override earlier) ─────────────────
+
+    #[test]
+    fn later_spec_overrides_earlier() {
+        let spec1 = CompletionSpec {
+            commands: vec!["test-cmd".to_string()],
+            icon: Some("A ".to_string()),
+            subcommands: {
+                let mut m = HashMap::new();
+                m.insert("sub1".to_string(), SubcommandSpec {
+                    description: "original".to_string(),
+                    glyph: "".to_string(),
+                    subcommands: HashMap::new(),
+                    flags: HashMap::new(),
+                });
+                m
+            },
+            flags: HashMap::new(),
+        };
+        let spec2 = CompletionSpec {
+            commands: vec!["test-cmd".to_string()],
+            icon: Some("B ".to_string()),
+            subcommands: {
+                let mut m = HashMap::new();
+                m.insert("sub1".to_string(), SubcommandSpec {
+                    description: "overridden".to_string(),
+                    glyph: "".to_string(),
+                    subcommands: HashMap::new(),
+                    flags: HashMap::new(),
+                });
+                m
+            },
+            flags: HashMap::new(),
+        };
+        let reg = SpecRegistry { specs: vec![spec1, spec2] };
+        let (_, desc) = reg.lookup("test-cmd", "sub1").unwrap();
+        assert_eq!(desc, "overridden");
+        assert_eq!(reg.icon("test-cmd"), Some("B "));
+    }
+
+    // ── load_specs_from_dir ──────────────────────────────────────────
+
+    #[test]
+    fn load_specs_from_dir_valid_yaml() {
+        let dir = tempfile::tempdir().unwrap();
+        let yaml = r#"
+commands: [mytest]
+icon: "T "
+subcommands:
+  run:
+    description: Run it
+    glyph: ">"
+"#;
+        std::fs::write(dir.path().join("test.yaml"), yaml).unwrap();
+        let specs = load_specs_from_dir(dir.path());
+        assert_eq!(specs.len(), 1);
+        assert!(specs[0].commands.contains(&"mytest".to_string()));
+    }
+
+    #[test]
+    fn load_specs_from_dir_ignores_non_yaml() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("test.txt"), "not yaml").unwrap();
+        std::fs::write(dir.path().join("test.json"), "{}").unwrap();
+        let specs = load_specs_from_dir(dir.path());
+        assert!(specs.is_empty());
+    }
+
+    #[test]
+    fn load_specs_from_dir_handles_yml_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let yaml = "commands: [ymltest]\nsubcommands: {}\n";
+        std::fs::write(dir.path().join("test.yml"), yaml).unwrap();
+        let specs = load_specs_from_dir(dir.path());
+        assert_eq!(specs.len(), 1);
+    }
+
+    #[test]
+    fn load_specs_from_dir_skips_invalid_yaml() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("bad.yaml"), "{{invalid yaml").unwrap();
+        let valid = "commands: [good]\nsubcommands: {}\n";
+        std::fs::write(dir.path().join("good.yaml"), valid).unwrap();
+        let specs = load_specs_from_dir(dir.path());
+        assert_eq!(specs.len(), 1);
+        assert!(specs[0].commands.contains(&"good".to_string()));
+    }
+
+    // ── SpecRegistry::new with user dirs ─────────────────────────────
+
+    #[test]
+    fn registry_with_user_dir_overrides_builtin() {
+        let dir = tempfile::tempdir().unwrap();
+        let yaml = r#"
+commands: [docker, podman]
+subcommands:
+  run:
+    description: Custom run override
+    glyph: ">"
+"#;
+        std::fs::write(dir.path().join("docker.yaml"), yaml).unwrap();
+        let cfg = config::SpecsConfig {
+            enable: true,
+            dirs: vec![dir.path().to_str().unwrap().to_string()],
+            project_specs: false,
+        };
+        let reg = SpecRegistry::new(&cfg);
+        let (_, desc) = reg.lookup("docker", "run").unwrap();
+        assert_eq!(desc, "Custom run override");
+    }
+
+    // ── is_k8s_command edge cases ────────────────────────────────────
+
+    #[test]
+    fn is_k8s_command_false_for_no_icon() {
+        let spec = CompletionSpec {
+            commands: vec!["noicon".to_string()],
+            icon: None,
+            subcommands: HashMap::new(),
+            flags: HashMap::new(),
+        };
+        let reg = SpecRegistry { specs: vec![spec] };
+        assert!(!reg.is_k8s_command("noicon"));
+    }
+
+    #[test]
+    fn is_k8s_command_false_for_wrong_icon() {
+        let spec = CompletionSpec {
+            commands: vec!["docker".to_string()],
+            icon: Some("\u{1F40B} ".to_string()),
+            subcommands: HashMap::new(),
+            flags: HashMap::new(),
+        };
+        let reg = SpecRegistry { specs: vec![spec] };
+        assert!(!reg.is_k8s_command("docker"));
+    }
+
+    #[test]
+    fn is_k8s_command_true_for_helm_wheel() {
+        let spec = CompletionSpec {
+            commands: vec!["myk8s".to_string()],
+            icon: Some("\u{2388} ".to_string()),
+            subcommands: HashMap::new(),
+            flags: HashMap::new(),
+        };
+        let reg = SpecRegistry { specs: vec![spec] };
+        assert!(reg.is_k8s_command("myk8s"));
+    }
+
+    // ── Mock provider k8s detection ──────────────────────────────────
+
+    #[test]
+    fn mock_provider_is_k8s() {
+        let mut mock = MockDescriptionProvider::new();
+        mock.k8s_commands.push("kubectl".to_string());
+        assert!(mock.is_k8s_command("kubectl"));
+        assert!(!mock.is_k8s_command("docker"));
+    }
+
+    // ── lookup with empty subcommands ────────────────────────────────
+
+    #[test]
+    fn lookup_empty_word() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        assert!(reg.lookup("kubectl", "").is_none());
+    }
+
+    #[test]
+    fn lookup_empty_command() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        assert!(reg.lookup("", "run").is_none());
+    }
+
+    // ── shellexpand edge cases ───────────────────────────────────────
+
+    #[test]
+    fn shellexpand_tilde_only() {
+        let result = shellexpand_tilde("~");
+        let home = std::env::var("HOME").unwrap_or_default();
+        assert_eq!(result, home);
+    }
+
+    #[test]
+    fn shellexpand_tilde_with_user_unsupported() {
+        // ~user/foo — we only expand leading ~, not ~user
+        let result = shellexpand_tilde("~otheruser/foo");
+        // Should still expand since it starts with ~
+        assert!(!result.starts_with('~') || std::env::var("HOME").is_err());
+    }
+
+    // ── All specs have commands field ────────────────────────────────
+
+    #[test]
+    fn all_builtin_specs_have_commands() {
+        for (name, content) in BUILTIN_SPECS {
+            let spec: CompletionSpec = serde_yaml::from_str(content)
+                .unwrap_or_else(|e| panic!("failed to parse {name}: {e}"));
+            assert!(!spec.commands.is_empty(), "{name} has no commands");
+        }
+    }
+
+    #[test]
+    fn all_builtin_specs_have_subcommands() {
+        for (name, content) in BUILTIN_SPECS {
+            let spec: CompletionSpec = serde_yaml::from_str(content)
+                .unwrap_or_else(|e| panic!("failed to parse {name}: {e}"));
+            assert!(!spec.subcommands.is_empty(), "{name} has no subcommands");
+        }
+    }
 }

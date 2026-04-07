@@ -1749,7 +1749,6 @@ mod tests {
 
     #[test]
     fn roundtrip_cursor_at_start() {
-        // Full roundtrip with cursor at word start
         let entry = b"screenshot\x02<\x00>\x00SUFFIX\x00screenshot\x00word\x00screenshot";
         let req = parse_compcap(entry, "vim", "", "vim ");
         let c = &req.candidates[0];
@@ -1768,7 +1767,404 @@ mod tests {
         );
         let fields: Vec<&str> = line.split('\x1f').collect();
         assert_eq!(fields[0], "screenshot");
-        assert_eq!(fields[1], "");           // empty prefix
-        assert_eq!(fields[2], "screenshot"); // full word as suffix
+        assert_eq!(fields[1], "");
+        assert_eq!(fields[2], "screenshot");
+    }
+
+    // ── parse_compcap boundary conditions ────────────────────────────
+
+    #[test]
+    fn parse_compcap_no_stx_marker() {
+        // Entry without STX should be skipped entirely
+        let data = b"nodisplay_and_no_stx_marker";
+        let req = parse_compcap(data, "cd", "", "cd ");
+        assert!(req.candidates.is_empty());
+    }
+
+    #[test]
+    fn parse_compcap_only_separator_bytes() {
+        let data = b"\x03\x03\x03";
+        let req = parse_compcap(data, "cd", "", "cd ");
+        assert!(req.candidates.is_empty());
+    }
+
+    #[test]
+    fn parse_compcap_missing_word_key() {
+        // Entry with STX but no "word" key → word defaults to empty
+        let entry = b"display\x02<\x00>\x00PREFIX\x00pre";
+        let req = parse_compcap(entry, "cd", "", "cd ");
+        assert_eq!(req.candidates.len(), 1);
+        assert_eq!(req.candidates[0].word, "");
+        assert_eq!(req.candidates[0].display, "display");
+    }
+
+    #[test]
+    fn parse_compcap_continuous_trigger_default() {
+        let req = parse_compcap(b"", "cd", "", "cd ");
+        assert_eq!(req.continuous_trigger, "/");
+    }
+
+    #[test]
+    fn parse_compcap_unicode_display() {
+        let entry = "éàü\x02<\x00>\x00word\x00éàü".as_bytes();
+        let req = parse_compcap(entry, "cd", "", "cd ");
+        assert_eq!(req.candidates.len(), 1);
+        assert_eq!(req.candidates[0].word, "éàü");
+        assert_eq!(req.candidates[0].display, "éàü");
+    }
+
+    // ── candidate display_text ───────────────────────────────────────
+
+    #[test]
+    fn candidate_display_text_empty_display_uses_word() {
+        let c = Candidate {
+            word: "the-word".into(),
+            display: "".into(),
+            ..Default::default()
+        };
+        assert_eq!(c.display_text(), "the-word");
+    }
+
+    // ── to_selection_with_config dir detection ───────────────────────
+
+    #[test]
+    fn candidate_to_selection_non_file_never_dir() {
+        let c = Candidate {
+            word: "/tmp".into(),
+            is_file: false,
+            ..Default::default()
+        };
+        let cfg = config::CompletionConfig::default();
+        let sel = c.to_selection_with_config(&cfg);
+        assert!(!sel.is_dir, "non-file candidate should never be detected as dir");
+    }
+
+    #[test]
+    fn candidate_to_selection_file_real_dir() {
+        let c = Candidate {
+            word: "/tmp".into(),
+            is_file: true,
+            ..Default::default()
+        };
+        let cfg = config::CompletionConfig::default();
+        let sel = c.to_selection_with_config(&cfg);
+        assert!(sel.is_dir);
+        assert!(sel.word.ends_with('/'));
+    }
+
+    #[test]
+    fn candidate_to_selection_dir_already_has_slash() {
+        let c = Candidate {
+            word: "/tmp/".into(),
+            is_file: true,
+            ..Default::default()
+        };
+        let cfg = config::CompletionConfig::default();
+        let sel = c.to_selection_with_config(&cfg);
+        assert!(sel.is_dir);
+        assert_eq!(sel.word, "/tmp/");
+    }
+
+    #[test]
+    fn candidate_to_selection_append_slash_disabled() {
+        let c = Candidate {
+            word: "/tmp".into(),
+            is_file: true,
+            ..Default::default()
+        };
+        let mut cfg = config::CompletionConfig::default();
+        cfg.dir_handling.append_slash = false;
+        let sel = c.to_selection_with_config(&cfg);
+        assert!(sel.is_dir);
+        assert_eq!(sel.word, "/tmp");
+    }
+
+    // ── colorize edge cases ──────────────────────────────────────────
+
+    #[test]
+    fn colorize_plain_word_gets_frost() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let result = colorize("some-random-thing", &c, &ls, "unknown-cmd", &K8sEnrichment::default(), &reg);
+        assert!(result.contains(ANSI_FROST));
+        assert_eq!(crate::strip_ansi(&result), "some-random-thing");
+    }
+
+    #[test]
+    fn colorize_file_with_empty_realdir() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate {
+            word: "file.txt".into(),
+            is_file: true,
+            realdir: "".into(),
+            ..Default::default()
+        };
+        let result = colorize("file.txt", &c, &ls, "ls", &K8sEnrichment::default(), &reg);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn colorize_namespace_active_no_pods() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let k8s = K8sEnrichment {
+            ns_pod_counts: HashMap::new(),
+            active_ns: "myns".to_string(),
+            ..Default::default()
+        };
+        let result = colorize("myns", &c, &ls, "kubectl", &k8s, &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("active"));
+        assert!(!stripped.contains("pods"));
+    }
+
+    #[test]
+    fn colorize_namespace_inactive_no_pods() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let k8s = K8sEnrichment {
+            ns_pod_counts: HashMap::new(),
+            active_ns: "other-ns".to_string(),
+            ..Default::default()
+        };
+        let result = colorize("myns", &c, &ls, "kubectl", &k8s, &reg);
+        let stripped = crate::strip_ansi(&result);
+        // inactive namespace with no pod count should have no enrichment
+        assert_eq!(stripped, "myns");
+    }
+
+    // ── color_description edge cases ─────────────────────────────────
+
+    #[test]
+    fn color_description_empty_string() {
+        let result = color_description("");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn color_description_single_ascii_char() {
+        let result = color_description("x");
+        assert_eq!(result, "x");
+    }
+
+    #[test]
+    fn color_description_single_unicode_char() {
+        let result = color_description("◉");
+        assert!(result.contains(ANSI_PURPLE));
+    }
+
+    // ── build_description edge cases ─────────────────────────────────
+
+    #[test]
+    fn build_description_no_match_returns_none() {
+        let reg = test_registry();
+        let k8s = K8sEnrichment::default();
+        assert!(build_description("completely-unknown-xyz", "unknown-tool", &k8s, &reg).is_none());
+    }
+
+    #[test]
+    fn build_description_namespace_active_with_pods_and_static() {
+        let reg = test_registry();
+        let k8s = K8sEnrichment {
+            resource_counts: HashMap::from([("default".to_string(), 3)]),
+            ns_pod_counts: HashMap::from([("default".to_string(), 10)]),
+            active_ns: "default".to_string(),
+        };
+        let desc = build_description("default", "kubectl", &k8s, &reg).unwrap();
+        assert!(desc.contains("3"));
+        assert!(desc.contains("active"));
+        assert!(desc.contains("10 pods"));
+    }
+
+    // ── tool_icon edge cases ─────────────────────────────────────────
+
+    #[test]
+    fn tool_icon_appends_space_when_missing() {
+        use crate::specs::MockDescriptionProvider;
+        let mut mock = MockDescriptionProvider::new();
+        mock.icons.insert("test".to_string(), "X".to_string());
+        let result = tool_icon("test", &mock);
+        assert_eq!(result.as_deref(), Some("X "));
+    }
+
+    #[test]
+    fn tool_icon_preserves_trailing_space() {
+        use crate::specs::MockDescriptionProvider;
+        let mut mock = MockDescriptionProvider::new();
+        mock.icons.insert("test".to_string(), "X ".to_string());
+        let result = tool_icon("test", &mock);
+        assert_eq!(result.as_deref(), Some("X "));
+    }
+
+    #[test]
+    fn tool_icon_returns_none_for_unknown() {
+        use crate::specs::MockDescriptionProvider;
+        let mock = MockDescriptionProvider::new();
+        assert!(tool_icon("unknown", &mock).is_none());
+    }
+
+    // ── completion_base_cmd edge cases ────────────────────────────────
+
+    #[test]
+    fn completion_base_cmd_empty_both() {
+        assert_eq!(completion_base_cmd("", ""), "");
+    }
+
+    #[test]
+    fn completion_base_cmd_whitespace_only_buffer() {
+        assert_eq!(completion_base_cmd("fallback", "   "), "fallback");
+    }
+
+    // ── has_resource_type_candidates ──────────────────────────────────
+
+    #[test]
+    fn has_resource_type_candidates_empty_list() {
+        assert!(!has_resource_type_candidates(&[]));
+    }
+
+    #[test]
+    fn has_resource_type_candidates_uses_display_over_word() {
+        let c = Candidate {
+            word: "pods".into(),
+            display: "pods/".into(),
+            ..Default::default()
+        };
+        assert!(has_resource_type_candidates(&[c]));
+    }
+
+    // ── is_namespace_completion ───────────────────────────────────────
+
+    #[test]
+    fn is_namespace_completion_empty_buffer() {
+        assert!(!is_namespace_completion(""));
+    }
+
+    #[test]
+    fn is_namespace_completion_only_flag() {
+        assert!(is_namespace_completion("-n"));
+        assert!(is_namespace_completion("--namespace"));
+    }
+
+    // ── parse_trigger_keycode edge cases ─────────────────────────────
+
+    #[test]
+    fn parse_trigger_keycode_unicode_char() {
+        let result = parse_trigger_keycode("é");
+        assert!(result.is_some());
+        let (bind, (code, mods)) = result.unwrap();
+        assert_eq!(bind, "é");
+        assert_eq!(code, KeyCode::Char('é'));
+        assert_eq!(mods, KeyModifiers::NONE);
+    }
+
+    #[test]
+    fn parse_trigger_keycode_multi_char_non_modifier() {
+        // e.g., "ab" — multi-char that isn't ctrl-/alt- → delegated
+        assert!(parse_trigger_keycode("ab").is_none());
+    }
+
+    // ── parse_accept_execute_key edge cases ──────────────────────────
+
+    #[test]
+    fn parse_accept_execute_key_uppercase() {
+        let result = parse_accept_execute_key("CTRL-A");
+        assert!(result.is_some());
+        let (bind, (code, mods)) = result.unwrap();
+        assert_eq!(bind, "ctrl-a");
+        assert_eq!(code, KeyCode::Char('a'));
+        assert_eq!(mods, KeyModifiers::CONTROL);
+    }
+
+    #[test]
+    fn parse_accept_execute_key_alt_multi_char() {
+        // "alt-ab" is too long for a single char
+        assert!(parse_accept_execute_key("alt-ab").is_none());
+    }
+
+    #[test]
+    fn parse_accept_execute_key_ctrl_multi_char() {
+        assert!(parse_accept_execute_key("ctrl-ab").is_none());
+    }
+
+    // ── matches_key with ALT modifier ────────────────────────────────
+
+    #[test]
+    fn matches_key_alt() {
+        let event = crossterm::event::KeyEvent::new(
+            KeyCode::Char('a'),
+            KeyModifiers::ALT,
+        );
+        assert!(matches_key(&event, &(KeyCode::Char('a'), KeyModifiers::ALT)));
+        assert!(!matches_key(&event, &(KeyCode::Char('a'), KeyModifiers::CONTROL)));
+    }
+
+    // ── lookup_description edge cases ────────────────────────────────
+
+    #[test]
+    fn lookup_description_command_with_colon() {
+        // curcontext format like "git:checkout:"
+        let reg = test_registry();
+        let result = lookup_description("get", "kubectl:get:", &reg);
+        assert!(result.is_some());
+        assert!(result.unwrap().contains("Display resources"));
+    }
+
+    #[test]
+    fn lookup_description_returns_none_for_unknown() {
+        let reg = test_registry();
+        assert!(lookup_description("xyz-no-such", "kubectl", &reg).is_none());
+    }
+
+    // ── CompletionResponse serialization ─────────────────────────────
+
+    #[test]
+    fn serialize_response_abort_no_selections() {
+        let resp = CompletionResponse {
+            action: "abort",
+            selections: vec![],
+            query: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"action\":\"abort\""));
+        assert!(!json.contains("selections"));
+    }
+
+    #[test]
+    fn serialize_response_with_query() {
+        let resp = CompletionResponse {
+            action: "select",
+            selections: vec![],
+            query: Some("test".to_string()),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"query\":\"test\""));
+    }
+
+    // ── parse_kv_arg edge cases ──────────────────────────────────────
+
+    #[test]
+    fn parse_kv_arg_key_at_end() {
+        let args: Vec<String> = vec!["--command".to_string()];
+        assert_eq!(parse_kv_arg(&args, "--command"), "");
+    }
+
+    #[test]
+    fn parse_kv_arg_empty_args() {
+        let args: Vec<String> = vec![];
+        assert_eq!(parse_kv_arg(&args, "--command"), "");
+    }
+
+    #[test]
+    fn parse_kv_arg_duplicate_keys() {
+        // First occurrence wins
+        let args: Vec<String> = vec!["--cmd", "first", "--cmd", "second"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        assert_eq!(parse_kv_arg(&args, "--cmd"), "first");
     }
 }
