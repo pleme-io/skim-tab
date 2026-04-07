@@ -271,15 +271,12 @@ pub fn load_specs_from_dir(path: &Path) -> Vec<CompletionSpec> {
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-/// Expand `~` at the start of a path to `$HOME`.
+use crate::expand_tilde;
+
+/// Expand `~` at the start of a path to `$HOME`. Delegates to `crate::expand_tilde`.
 #[must_use]
 fn shellexpand_tilde(path: &str) -> String {
-    if let Some(rest) = path.strip_prefix('~')
-        && let Ok(home) = std::env::var("HOME")
-    {
-        return format!("{home}{rest}");
-    }
-    path.to_string()
+    expand_tilde(path)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────

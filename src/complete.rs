@@ -93,13 +93,7 @@ impl Candidate {
             } else {
                 format!("{}{}", self.realdir, self.word)
             };
-            let expanded = if path.starts_with('~') {
-                std::env::var("HOME")
-                    .map(|h| path.replacen('~', &h, 1))
-                    .unwrap_or(path)
-            } else {
-                path
-            };
+            let expanded = crate::expand_tilde(&path);
             std::path::Path::new(&expanded).is_dir()
         };
         let word = if is_dir && cfg.dir_handling.append_slash && !self.word.ends_with('/') {
