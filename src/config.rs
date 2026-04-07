@@ -118,6 +118,7 @@ impl Default for CompletionConfig {
 /// How completion candidates are sourced.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum CompletionMode {
     /// Poll live sources directly (kubectl, fs, history). Default.
     #[default]
