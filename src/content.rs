@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
 use skim::Skim;
-use skim_tab::{base_options, editor, parse_query, shell_quote, ICON_SEARCH};
+use skim_tab::{base_options, build_options, editor, parse_query, shell_quote, ICON_SEARCH};
 
 /// Run ripgrep and return stdout. Color is OFF so delimiter parsing is clean.
 /// Skim still highlights fuzzy matches via its own hl/hl+ colors.
@@ -64,18 +64,19 @@ fn main() -> Result<()> {
     let item_reader = SkimItemReader::default();
     let items = item_reader.of_bufread(io::Cursor::new(entries));
 
-    let options = base_options(query)
-        .delimiter(regex::Regex::new(":").expect("valid regex"))
-        // Fuzzy match only against content (field 3+), not filenames or line numbers
-        .nth(vec!["3..".to_string()])
-        .height("80%".to_string())
-        .min_height("20".to_string())
-        .prompt(ICON_SEARCH.to_string())
-        .preview(preview_command())
-        .preview_window(PreviewLayout::from("up,60%,border-rounded,+{2}+3/3,~3"))
-        .header("Search in files | CTRL-/: Toggle Preview | ESC: Cancel".to_string())
-        .build()
-        .expect("failed to build skim options");
+    let colon_delim = regex::Regex::new(":")
+        .context("failed to compile delimiter regex")?;
+    let options = build_options(
+        base_options(query)
+            .delimiter(colon_delim)
+            .nth(vec!["3..".to_string()])
+            .height("80%".to_string())
+            .min_height("20".to_string())
+            .prompt(ICON_SEARCH.to_string())
+            .preview(preview_command())
+            .preview_window(PreviewLayout::from("up,60%,border-rounded,+{2}+3/3,~3"))
+            .header("Search in files | CTRL-/: Toggle Preview | ESC: Cancel".to_string()),
+    )?;
 
     match Skim::run_with(options, Some(items)) {
         Ok(out) if !out.is_abort => {

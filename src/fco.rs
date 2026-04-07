@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
 use skim::Skim;
-use skim_tab::base_options;
+use skim_tab::{base_options, build_options};
 
 /// Icon for git operations.
 const ICON_GIT: &str = "\u{25ce} "; // ◎ (bullseye — branch target)
@@ -44,13 +44,13 @@ fn main() -> Result<()> {
     let item_reader = SkimItemReader::default();
     let items = item_reader.of_bufread(io::Cursor::new(branches));
 
-    let options = base_options("")
-        .prompt(ICON_GIT.to_string())
-        .preview("git log --oneline --graph --color=always -20 {} 2>/dev/null".to_string())
-        .preview_window(PreviewLayout::from("right:50%:wrap"))
-        .header("Branches | CTRL-/: Toggle Preview | ESC: Cancel".to_string())
-        .build()
-        .expect("failed to build skim options");
+    let options = build_options(
+        base_options("")
+            .prompt(ICON_GIT.to_string())
+            .preview("git log --oneline --graph --color=always -20 {} 2>/dev/null".to_string())
+            .preview_window(PreviewLayout::from("right:50%:wrap"))
+            .header("Branches | CTRL-/: Toggle Preview | ESC: Cancel".to_string()),
+    )?;
 
     match Skim::run_with(options, Some(items)) {
         Ok(out) if !out.is_abort => {

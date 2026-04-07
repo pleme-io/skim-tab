@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
 use skim::Skim;
-use skim_tab::{base_options, ICON_MARKER, ICON_SEARCH};
+use skim_tab::{base_options, build_options, ICON_MARKER, ICON_SEARCH};
 
 /// List processes via ps.
 fn process_list() -> Result<String> {
@@ -37,20 +37,20 @@ fn main() -> Result<()> {
     let item_reader = SkimItemReader::default();
     let items = item_reader.of_bufread(io::Cursor::new(entries));
 
-    let options = base_options("")
-        .prompt(ICON_SEARCH.to_string())
-        .multi(true)
-        .multi_select_icon(ICON_MARKER.to_string())
-        .preview(
-            "ps -p {1} -o pid,user,comm,%cpu,%mem,start,time,command 2>/dev/null || echo 'Process not found'"
-                .to_string(),
-        )
-        .preview_window(PreviewLayout::from("down:4:wrap"))
-        .header(format!(
-            "Processes (signal: {signal}) | TAB: Multi-select | ESC: Cancel"
-        ))
-        .build()
-        .expect("failed to build skim options");
+    let options = build_options(
+        base_options("")
+            .prompt(ICON_SEARCH.to_string())
+            .multi(true)
+            .multi_select_icon(ICON_MARKER.to_string())
+            .preview(
+                "ps -p {1} -o pid,user,comm,%cpu,%mem,start,time,command 2>/dev/null || echo 'Process not found'"
+                    .to_string(),
+            )
+            .preview_window(PreviewLayout::from("down:4:wrap"))
+            .header(format!(
+                "Processes (signal: {signal}) | TAB: Multi-select | ESC: Cancel"
+            )),
+    )?;
 
     match Skim::run_with(options, Some(items)) {
         Ok(out) if !out.is_abort => {
