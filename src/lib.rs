@@ -228,12 +228,153 @@ mod tests {
 
     #[test]
     fn icons_are_single_width() {
-        // All icons should be terminal-safe single-width characters
         assert!(!ICON_POINTER.is_empty());
         assert!(!ICON_SEARCH.is_empty());
         assert!(!ICON_FILES.is_empty());
         assert!(!ICON_HISTORY.is_empty());
         assert!(!ICON_MARKER.is_empty());
         assert!(!ICON_CD.is_empty());
+        assert!(!ICON_K8S.is_empty());
+    }
+
+    // ── editor() ─────────────────────────────────────────────────────
+
+    #[test]
+    fn editor_returns_env_editor() {
+        std::env::set_var("EDITOR", "vim");
+        std::env::remove_var("VISUAL");
+        assert_eq!(editor(), "vim");
+        std::env::remove_var("EDITOR");
+    }
+
+    #[test]
+    fn editor_falls_back_to_visual() {
+        std::env::remove_var("EDITOR");
+        std::env::set_var("VISUAL", "code");
+        assert_eq!(editor(), "code");
+        std::env::remove_var("VISUAL");
+    }
+
+    #[test]
+    fn editor_defaults_to_nvim() {
+        std::env::remove_var("EDITOR");
+        std::env::remove_var("VISUAL");
+        assert_eq!(editor(), "nvim");
+    }
+
+    // ── strip_ansi edge cases ────────────────────────────────────────
+
+    #[test]
+    fn strip_ansi_removes_osc_bel() {
+        // OSC terminated by BEL (\x07)
+        assert_eq!(strip_ansi("\x1b]0;title\x07text"), "text");
+    }
+
+    #[test]
+    fn strip_ansi_removes_osc_st() {
+        // OSC terminated by ST (\x1b\\)
+        assert_eq!(strip_ansi("\x1b]0;title\x1b\\text"), "text");
+    }
+
+    #[test]
+    fn strip_ansi_bare_escape_passthrough() {
+        // Lone ESC not followed by [ or ] should be consumed without
+        // eating subsequent content
+        let result = strip_ansi("\x1bXhello");
+        assert!(result.contains("hello"));
+    }
+
+    #[test]
+    fn strip_ansi_empty_string() {
+        assert_eq!(strip_ansi(""), "");
+    }
+
+    #[test]
+    fn strip_ansi_multiple_sequences() {
+        let input = "\x1b[31mred\x1b[0m \x1b[32mgreen\x1b[0m";
+        assert_eq!(strip_ansi(input), "red green");
+    }
+
+    #[test]
+    fn strip_ansi_nested_csi_params() {
+        // True-color escape with many params
+        assert_eq!(
+            strip_ansi("\x1b[38;2;136;192;208mfrost\x1b[0m"),
+            "frost"
+        );
+    }
+
+    // ── parse_query edge cases ───────────────────────────────────────
+
+    #[test]
+    fn parse_query_at_end_of_args() {
+        // --query at end with no value
+        let args: Vec<String> = vec!["--query".to_string()];
+        assert_eq!(parse_query(&args), "");
+    }
+
+    #[test]
+    fn parse_query_empty_args() {
+        let args: Vec<String> = vec![];
+        assert_eq!(parse_query(&args), "");
+    }
+
+    #[test]
+    fn parse_query_multiple_flags() {
+        let args: Vec<String> = vec!["--other", "val", "--query", "hello", "--more"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        assert_eq!(parse_query(&args), "hello");
+    }
+
+    // ── shell_quote edge cases ───────────────────────────────────────
+
+    #[test]
+    fn shell_quote_empty_string() {
+        // Empty string has no special chars → passes through unquoted
+        assert_eq!(shell_quote(""), "");
+    }
+
+    #[test]
+    fn shell_quote_special_chars() {
+        assert_eq!(shell_quote("$HOME"), "'$HOME'");
+        assert_eq!(shell_quote("a b"), "'a b'");
+        assert_eq!(shell_quote("foo`bar"), "'foo`bar'");
+    }
+
+    #[test]
+    fn shell_quote_backslash() {
+        assert_eq!(shell_quote("a\\b"), "'a\\b'");
+    }
+
+    #[test]
+    fn shell_quote_safe_chars_passthrough() {
+        assert_eq!(shell_quote("a-b_c.d/e"), "a-b_c.d/e");
+        assert_eq!(shell_quote("ABC123"), "ABC123");
+    }
+
+    // ── ANSI color constants ─────────────────────────────────────────
+
+    #[test]
+    fn ansi_constants_are_valid_escape_sequences() {
+        for (name, val) in [
+            ("FROST", ANSI_FROST),
+            ("YELLOW", ANSI_YELLOW),
+            ("DIM", ANSI_DIM),
+            ("GREEN", ANSI_GREEN),
+            ("PURPLE", ANSI_PURPLE),
+            ("RESET", ANSI_RESET),
+        ] {
+            assert!(val.starts_with('\x1b'), "{name} should start with ESC");
+        }
+    }
+
+    #[test]
+    fn standard_binds_are_non_empty() {
+        assert!(!STANDARD_BINDS.is_empty());
+        for bind in STANDARD_BINDS {
+            assert!(bind.contains(':'), "bind '{bind}' should have a colon");
+        }
     }
 }

@@ -406,4 +406,107 @@ mod tests {
         let scores = HistoryStore::frecency_scores(&store, "cd", "/tmp").unwrap();
         assert!(scores.is_empty());
     }
+
+    // ── frecency_score additional cases ──────────────────────────────
+
+    #[test]
+    fn frecency_score_large_age() {
+        let score = frecency_score(365.0, 1);
+        assert!(score > 0.0);
+        assert!(score < 0.01, "very old entries should have near-zero score: {score}");
+    }
+
+    #[test]
+    fn frecency_score_one_day() {
+        let score = frecency_score(1.0, 1);
+        assert!((score - 0.5).abs() < f64::EPSILON, "1-day-old score should be 0.5, got {score}");
+    }
+
+    #[test]
+    fn frecency_score_half_day() {
+        let score = frecency_score(0.5, 1);
+        let expected = 1.0 / 1.5;
+        assert!(
+            (score - expected).abs() < f64::EPSILON,
+            "half-day score should be {expected}, got {score}"
+        );
+    }
+
+    // ── HistoryDb multiple records same word ─────────────────────────
+
+    #[test]
+    fn multiple_records_accumulate_score() {
+        let db = test_db();
+        db.record("cd", "/tmp", "docs").unwrap();
+        db.record("cd", "/tmp", "docs").unwrap();
+        db.record("cd", "/tmp", "docs").unwrap();
+        let scores = db.frecency_scores("cd", "/tmp").unwrap();
+        let score = scores["docs"];
+        // 3 records at age ~0 each contribute ~1.0 → sum ~3.0
+        assert!(score > 2.5 && score <= 3.0, "expected ~3.0, got {score}");
+    }
+
+    // ── HistoryDb cleanup with boundary ──────────────────────────────
+
+    #[test]
+    fn cleanup_with_zero_days() {
+        let db = test_db();
+        // Insert an entry 1 second in the past to ensure it's < unixepoch()
+        db.conn
+            .execute(
+                "INSERT INTO selections (command, cwd, word, timestamp)
+                 VALUES ('cd', '/tmp', 'old', unixepoch() - 1)",
+                [],
+            )
+            .unwrap();
+        let deleted = db.cleanup(0).unwrap();
+        assert_eq!(deleted, 1);
+    }
+
+    // ── db_path resolution ───────────────────────────────────────────
+
+    #[test]
+    fn db_path_with_xdg_data_home() {
+        std::env::set_var("XDG_DATA_HOME", "/tmp/xdg-test");
+        let path = HistoryDb::db_path();
+        assert!(path.starts_with("/tmp/xdg-test/skim-tab"));
+        assert!(path.ends_with("selections.db"));
+        std::env::remove_var("XDG_DATA_HOME");
+    }
+
+    #[test]
+    fn db_path_without_xdg_uses_home() {
+        std::env::remove_var("XDG_DATA_HOME");
+        let path = HistoryDb::db_path();
+        let path_str = path.to_str().unwrap();
+        assert!(path_str.contains("skim-tab") && path_str.contains("selections.db"));
+    }
+
+    // ── MemHistoryStore isolation ─────────────────────────────────────
+
+    #[test]
+    fn mem_history_store_different_cwd() {
+        let store = MemHistoryStore::new();
+        HistoryStore::record(&store, "cd", "/dir/a", "docs").unwrap();
+        HistoryStore::record(&store, "cd", "/dir/b", "src").unwrap();
+
+        let a_scores = HistoryStore::frecency_scores(&store, "cd", "/dir/a").unwrap();
+        let b_scores = HistoryStore::frecency_scores(&store, "cd", "/dir/b").unwrap();
+
+        assert!(a_scores.contains_key("docs"));
+        assert!(!a_scores.contains_key("src"));
+        assert!(b_scores.contains_key("src"));
+        assert!(!b_scores.contains_key("docs"));
+    }
+
+    // ── HistoryStore trait through HistoryDb ─────────────────────────
+
+    #[test]
+    fn history_db_as_trait_object() {
+        let db = test_db();
+        let store: &dyn HistoryStore = &db;
+        store.record("git", "/repo", "commit").unwrap();
+        let scores = store.frecency_scores("git", "/repo").unwrap();
+        assert!(scores.contains_key("commit"));
+    }
 }

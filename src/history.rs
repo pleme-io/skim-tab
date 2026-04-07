@@ -156,4 +156,64 @@ mod tests {
     fn parse_empty_command() {
         assert_eq!(parse_history_line(": 1709876543:0;"), "");
     }
+
+    // ── parse_history_line edge cases ────────────────────────────────
+
+    #[test]
+    fn parse_colon_space_but_no_semicolon() {
+        // Starts with ": " but has no semicolon → should return full line
+        assert_eq!(parse_history_line(": no semicolon here"), ": no semicolon here");
+    }
+
+    #[test]
+    fn parse_empty_line() {
+        assert_eq!(parse_history_line(""), "");
+    }
+
+    #[test]
+    fn parse_multiline_command_single() {
+        // A single line ending with backslash — the parser sees it as one line
+        assert_eq!(
+            parse_history_line(": 1709876543:0;echo hello\\"),
+            "echo hello\\"
+        );
+    }
+
+    #[test]
+    fn parse_line_with_only_colon_space() {
+        assert_eq!(parse_history_line(": "), ": ");
+    }
+
+    #[test]
+    fn parse_plain_command_with_semicolons() {
+        assert_eq!(
+            parse_history_line("echo a; echo b; echo c"),
+            "echo a; echo b; echo c"
+        );
+    }
+
+    #[test]
+    fn parse_extended_with_duration() {
+        // Extended format with duration
+        assert_eq!(
+            parse_history_line(": 1709876543:123;long running cmd"),
+            "long running cmd"
+        );
+    }
+
+    // ── history_path ─────────────────────────────────────────────────
+
+    #[test]
+    fn history_path_uses_histfile_env() {
+        env::set_var("HISTFILE", "/tmp/test_history");
+        assert_eq!(history_path(), PathBuf::from("/tmp/test_history"));
+        env::remove_var("HISTFILE");
+    }
+
+    #[test]
+    fn history_path_defaults_to_zsh_history() {
+        env::remove_var("HISTFILE");
+        let path = history_path();
+        assert!(path.to_str().unwrap().ends_with(".zsh_history"));
+    }
 }
