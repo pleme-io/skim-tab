@@ -343,4 +343,95 @@ mod tests {
         };
         assert!(!is_dir_candidate(&c));
     }
+
+    // ── expand_home edge cases ───────────────────────────────────────
+
+    #[test]
+    fn expand_home_tilde_only() {
+        let result = expand_home("~");
+        let home = std::env::var("HOME").unwrap();
+        assert_eq!(result, home);
+    }
+
+    #[test]
+    fn expand_home_tilde_slash() {
+        let result = expand_home("~/");
+        let home = std::env::var("HOME").unwrap();
+        assert_eq!(result, format!("{home}/"));
+    }
+
+    // ── readdir_candidates sorting ───────────────────────────────────
+
+    #[test]
+    fn readdir_candidates_sorted_alphabetically() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        std::fs::write(dir.path().join("zebra"), "").unwrap();
+        std::fs::write(dir.path().join("apple"), "").unwrap();
+        std::fs::write(dir.path().join("mango"), "").unwrap();
+
+        let candidates = readdir_candidates(dir.path().to_str().unwrap(), "", false);
+        assert_eq!(candidates.len(), 3);
+        assert_eq!(candidates[0].display, "apple");
+        assert_eq!(candidates[1].display, "mango");
+        assert_eq!(candidates[2].display, "zebra");
+    }
+
+    // ── readdir_candidates dirs_only with hidden ─────────────────────
+
+    #[test]
+    fn readdir_candidates_dirs_only_includes_hidden_dir() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        std::fs::create_dir(dir.path().join(".hidden")).unwrap();
+        std::fs::write(dir.path().join("file.txt"), "").unwrap();
+
+        let candidates = readdir_candidates(dir.path().to_str().unwrap(), "", true);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].display, ".hidden");
+    }
+
+    // ── candidate_fs_path with empty word ────────────────────────────
+
+    #[test]
+    fn candidate_fs_path_empty_word() {
+        let c = Candidate {
+            word: "".into(),
+            realdir: "/some/dir/".into(),
+            ..Candidate::default()
+        };
+        assert_eq!(candidate_fs_path(&c), "/some/dir/");
+    }
+
+    #[test]
+    fn candidate_fs_path_both_empty() {
+        let c = Candidate {
+            word: "".into(),
+            ..Candidate::default()
+        };
+        assert_eq!(candidate_fs_path(&c), "");
+    }
+
+    // ── is_dir_candidate with nonexistent path ───────────────────────
+
+    #[test]
+    fn is_dir_candidate_nonexistent_path() {
+        let c = Candidate {
+            word: "/tmp/nonexistent-skim-tab-dir-xyz".into(),
+            is_file: true,
+            ..Candidate::default()
+        };
+        assert!(!is_dir_candidate(&c));
+    }
+
+    // ── readdir_candidates prefix accumulation ───────────────────────
+
+    #[test]
+    fn readdir_candidates_nested_prefix() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        std::fs::write(dir.path().join("inner"), "").unwrap();
+
+        let candidates = readdir_candidates(dir.path().to_str().unwrap(), "a/b/c/", false);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].word, "a/b/c/inner");
+        assert_eq!(candidates[0].display, "inner");
+    }
 }

@@ -141,7 +141,64 @@ mod tests {
 
     #[test]
     fn current_project_returns_something() {
-        // Just verifying it doesn't panic
         let _ = current_project();
+    }
+
+    // ── Priority tests ──────────────────────────────────────────────
+
+    #[test]
+    fn nix_takes_priority_over_node() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("flake.nix"), "").unwrap();
+        fs::write(dir.path().join("package.json"), "").unwrap();
+        assert_eq!(detect_project(dir.path()), ProjectType::Nix);
+    }
+
+    #[test]
+    fn go_takes_priority_over_python() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("go.mod"), "").unwrap();
+        fs::write(dir.path().join("pyproject.toml"), "").unwrap();
+        assert_eq!(detect_project(dir.path()), ProjectType::Go);
+    }
+
+    // ── All variants have Debug ──────────────────────────────────────
+
+    #[test]
+    fn project_type_debug_formatting() {
+        let types = vec![
+            ProjectType::Rust,
+            ProjectType::Node,
+            ProjectType::Python,
+            ProjectType::Go,
+            ProjectType::Nix,
+            ProjectType::Zig,
+            ProjectType::Ruby,
+            ProjectType::Terraform,
+            ProjectType::Helm,
+            ProjectType::Unknown,
+        ];
+        for t in types {
+            let debug = format!("{t:?}");
+            assert!(!debug.is_empty());
+        }
+    }
+
+    // ── Nonexistent directory ────────────────────────────────────────
+
+    #[test]
+    fn detect_nonexistent_dir() {
+        let result = detect_project(Path::new("/tmp/nonexistent-skim-tab-test-dir-xyz"));
+        assert_eq!(result, ProjectType::Unknown);
+    }
+
+    // ── ProjectType Clone and Eq ─────────────────────────────────────
+
+    #[test]
+    fn project_type_clone_and_eq() {
+        let a = ProjectType::Rust;
+        let b = a.clone();
+        assert_eq!(a, b);
+        assert_ne!(ProjectType::Rust, ProjectType::Node);
     }
 }
