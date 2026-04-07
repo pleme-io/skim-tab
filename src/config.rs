@@ -41,6 +41,8 @@
 //!     frecency: false              # frecency-based candidate reordering (opt-in)
 //! ```
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 use shikumi::{ConfigDiscovery, Format, ProviderChain};
 
@@ -125,13 +127,25 @@ pub enum CompletionMode {
     Hybrid,
 }
 
+impl fmt::Display for CompletionMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Direct => write!(f, "direct"),
+            Self::Service => write!(f, "service"),
+            Self::Hybrid => write!(f, "hybrid"),
+        }
+    }
+}
+
 impl CompletionMode {
     /// Whether direct (local) enrichment should run.
+    #[must_use]
     pub fn use_direct(self) -> bool {
         matches!(self, Self::Direct | Self::Hybrid)
     }
 
     /// Whether the gRPC service should be queried.
+    #[must_use]
     pub fn use_service(self) -> bool {
         matches!(self, Self::Service | Self::Hybrid)
     }
@@ -368,6 +382,7 @@ impl Default for DirectConfig {
 ///
 /// Layers (later wins): defaults → config file → env vars.
 /// Missing config file is fine — defaults are always valid.
+#[must_use]
 pub fn load() -> Config {
     let path = ConfigDiscovery::new("skim-tab")
         .env_override("SKIM_TAB_CONFIG")
@@ -695,5 +710,12 @@ completion:
         let yaml = "completion:\n  mode: invalid_mode\n";
         let result = serde_yaml::from_str::<Config>(yaml);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn completion_mode_display() {
+        assert_eq!(CompletionMode::Direct.to_string(), "direct");
+        assert_eq!(CompletionMode::Service.to_string(), "service");
+        assert_eq!(CompletionMode::Hybrid.to_string(), "hybrid");
     }
 }
