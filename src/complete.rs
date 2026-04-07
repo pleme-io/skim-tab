@@ -470,25 +470,25 @@ fn parse_accept_execute_key(key_spec: &str) -> Option<ParsedKey> {
     let lower = key_spec.to_lowercase();
 
     // ctrl-<char> patterns
-    if let Some(ch_str) = lower.strip_prefix("ctrl-") {
-        if ch_str.len() == 1 || ch_str.chars().count() == 1 {
-            let ch = ch_str.chars().next()?;
-            return Some((
-                format!("ctrl-{ch}"),
-                (KeyCode::Char(ch), KeyModifiers::CONTROL),
-            ));
-        }
+    if let Some(ch_str) = lower.strip_prefix("ctrl-")
+        && (ch_str.len() == 1 || ch_str.chars().count() == 1)
+    {
+        let ch = ch_str.chars().next()?;
+        return Some((
+            format!("ctrl-{ch}"),
+            (KeyCode::Char(ch), KeyModifiers::CONTROL),
+        ));
     }
 
     // alt-<char> patterns
-    if let Some(ch_str) = lower.strip_prefix("alt-") {
-        if ch_str.len() == 1 || ch_str.chars().count() == 1 {
-            let ch = ch_str.chars().next()?;
-            return Some((
-                format!("alt-{ch}"),
-                (KeyCode::Char(ch), KeyModifiers::ALT),
-            ));
-        }
+    if let Some(ch_str) = lower.strip_prefix("alt-")
+        && (ch_str.len() == 1 || ch_str.chars().count() == 1)
+    {
+        let ch = ch_str.chars().next()?;
+        return Some((
+            format!("alt-{ch}"),
+            (KeyCode::Char(ch), KeyModifiers::ALT),
+        ));
     }
 
     // Bare single character
@@ -630,22 +630,20 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         None
     };
 
-    if cfg.completion.enrichment.frecency {
-        if let Some(ref db) = history_db {
-            let cwd = std::env::current_dir()
-                .map(|d| d.to_string_lossy().to_string())
-                .unwrap_or_default();
-            if let Ok(scores) = db.frecency_scores(&base_cmd, &cwd) {
-                if !scores.is_empty() {
-                    // Stable sort: candidates with higher frecency come first,
-                    // candidates without history preserve their original order.
-                    req.candidates.sort_by(|a, b| {
-                        let sa = scores.get(&a.word).copied().unwrap_or(0.0);
-                        let sb = scores.get(&b.word).copied().unwrap_or(0.0);
-                        sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
-                    });
-                }
-            }
+    if cfg.completion.enrichment.frecency
+        && let Some(ref db) = history_db
+    {
+        let cwd = std::env::current_dir()
+            .map(|d| d.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if let Ok(scores) = db.frecency_scores(&base_cmd, &cwd)
+            && !scores.is_empty()
+        {
+            req.candidates.sort_by(|a, b| {
+                let sa = scores.get(&a.word).copied().unwrap_or(0.0);
+                let sb = scores.get(&b.word).copied().unwrap_or(0.0);
+                sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
+            });
         }
     }
 
@@ -815,45 +813,44 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     // ── R2a: continuous trigger — descend into directory ──────────
     // If the trigger key (e.g., "/") was pressed and the selection is
     // a single directory, enter the descent loop immediately.
-    if was_trigger && selections.len() == 1 && selections[0].is_dir {
-        if let Some(sc) = req.candidates.iter().find(|c| {
+    if was_trigger && selections.len() == 1 && selections[0].is_dir
+        && let Some(sc) = req.candidates.iter().find(|c| {
             let sel_word = &selections[0].word;
             c.word == *sel_word || format!("{}/", c.word) == *sel_word
-        }) {
-            let final_sel = crate::descent::run_descent(
-                sc,
-                &selections[0],
-                &req.command,
-                matches!(output_mode, OutputMode::Eval),
-            );
-            print_response("select", &[final_sel], output_mode, false);
-            return;
-        }
+        })
+    {
+        let final_sel = crate::descent::run_descent(
+            sc,
+            &selections[0],
+            &req.command,
+            matches!(output_mode, OutputMode::Eval),
+        );
+        print_response("select", &[final_sel], output_mode, false);
+        return;
     }
 
     // Optional in-picker descent for single directory selection from multi-candidate
     // (legacy behavior: descend on any dir select when in_picker_descent is enabled)
-    if cfg.completion.in_picker_descent && selections.len() == 1 && selections[0].is_dir {
-        if let Some(sc) = req.candidates.iter().find(|c| {
+    if cfg.completion.in_picker_descent && selections.len() == 1 && selections[0].is_dir
+        && let Some(sc) = req.candidates.iter().find(|c| {
             let sel_word = &selections[0].word;
-            // Match with or without trailing /
             c.word == *sel_word || format!("{}/", c.word) == *sel_word
-        }) {
-            let final_sel = crate::descent::run_descent(sc, &selections[0], &req.command, matches!(output_mode, OutputMode::Eval));
-            print_response("select", &[final_sel], output_mode, false);
-            return;
-        }
+        })
+    {
+        let final_sel = crate::descent::run_descent(sc, &selections[0], &req.command, matches!(output_mode, OutputMode::Eval));
+        print_response("select", &[final_sel], output_mode, false);
+        return;
     }
 
     // ── History: record selections ────────────────────────────────
-    if cfg.completion.enrichment.history_boost && !selections.is_empty() {
-        if let Some(ref db) = history_db {
-            let cwd = std::env::current_dir()
-                .map(|d| d.to_string_lossy().to_string())
-                .unwrap_or_default();
-            for sel in &selections {
-                let _ = db.record(&base_cmd, &cwd, &sel.word);
-            }
+    if cfg.completion.enrichment.history_boost && !selections.is_empty()
+        && let Some(ref db) = history_db
+    {
+        let cwd = std::env::current_dir()
+            .map(|d| d.to_string_lossy().to_string())
+            .unwrap_or_default();
+        for sel in &selections {
+            let _ = db.record(&base_cmd, &cwd, &sel.word);
         }
     }
 

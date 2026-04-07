@@ -569,10 +569,10 @@ fn preview_proc(word: &str) -> String {
 
 /// Preview a command using tldr with fallback to --help.
 fn preview_command(cmd: &str) -> String {
-    if let Ok(out) = Command::new("tldr").args(["--color=always", cmd]).output() {
-        if out.status.success() && !out.stdout.is_empty() {
-            return String::from_utf8_lossy(&out.stdout).into_owned();
-        }
+    if let Ok(out) = Command::new("tldr").args(["--color=always", cmd]).output()
+        && out.status.success() && !out.stdout.is_empty()
+    {
+        return String::from_utf8_lossy(&out.stdout).into_owned();
     }
     if let Ok(out) = Command::new(cmd).arg("--help").output() {
         let text = if out.stdout.is_empty() {

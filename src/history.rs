@@ -18,10 +18,10 @@ use skim_tab::{base_options, parse_query, ICON_HISTORY};
 /// Parse a zsh extended history line.
 /// Format: `: TIMESTAMP:0;COMMAND` or just `COMMAND` (plain format).
 fn parse_history_line(line: &str) -> &str {
-    if line.starts_with(": ") {
-        if let Some(pos) = line.find(';') {
-            return &line[pos + 1..];
-        }
+    if line.starts_with(": ")
+        && let Some(pos) = line.find(';')
+    {
+        return &line[pos + 1..];
     }
     line
 }
@@ -205,14 +205,14 @@ mod tests {
 
     #[test]
     fn history_path_uses_histfile_env() {
-        env::set_var("HISTFILE", "/tmp/test_history");
+        unsafe { env::set_var("HISTFILE", "/tmp/test_history") };
         assert_eq!(history_path(), PathBuf::from("/tmp/test_history"));
-        env::remove_var("HISTFILE");
+        unsafe { env::remove_var("HISTFILE") };
     }
 
     #[test]
     fn history_path_defaults_to_zsh_history() {
-        env::remove_var("HISTFILE");
+        unsafe { env::remove_var("HISTFILE") };
         let path = history_path();
         assert!(path.to_str().unwrap().ends_with(".zsh_history"));
     }

@@ -241,24 +241,30 @@ mod tests {
 
     #[test]
     fn editor_returns_env_editor() {
-        std::env::set_var("EDITOR", "vim");
-        std::env::remove_var("VISUAL");
+        unsafe {
+            std::env::set_var("EDITOR", "vim");
+            std::env::remove_var("VISUAL");
+        }
         assert_eq!(editor(), "vim");
-        std::env::remove_var("EDITOR");
+        unsafe { std::env::remove_var("EDITOR") };
     }
 
     #[test]
     fn editor_falls_back_to_visual() {
-        std::env::remove_var("EDITOR");
-        std::env::set_var("VISUAL", "code");
+        unsafe {
+            std::env::remove_var("EDITOR");
+            std::env::set_var("VISUAL", "code");
+        }
         assert_eq!(editor(), "code");
-        std::env::remove_var("VISUAL");
+        unsafe { std::env::remove_var("VISUAL") };
     }
 
     #[test]
     fn editor_defaults_to_nvim() {
-        std::env::remove_var("EDITOR");
-        std::env::remove_var("VISUAL");
+        unsafe {
+            std::env::remove_var("EDITOR");
+            std::env::remove_var("VISUAL");
+        }
         assert_eq!(editor(), "nvim");
     }
 

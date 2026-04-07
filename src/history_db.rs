@@ -467,16 +467,16 @@ mod tests {
 
     #[test]
     fn db_path_with_xdg_data_home() {
-        std::env::set_var("XDG_DATA_HOME", "/tmp/xdg-test");
+        unsafe { std::env::set_var("XDG_DATA_HOME", "/tmp/xdg-test") };
         let path = HistoryDb::db_path();
         assert!(path.starts_with("/tmp/xdg-test/skim-tab"));
         assert!(path.ends_with("selections.db"));
-        std::env::remove_var("XDG_DATA_HOME");
+        unsafe { std::env::remove_var("XDG_DATA_HOME") };
     }
 
     #[test]
     fn db_path_without_xdg_uses_home() {
-        std::env::remove_var("XDG_DATA_HOME");
+        unsafe { std::env::remove_var("XDG_DATA_HOME") };
         let path = HistoryDb::db_path();
         let path_str = path.to_str().unwrap();
         assert!(path_str.contains("skim-tab") && path_str.contains("selections.db"));
