@@ -148,12 +148,11 @@ impl DescriptionProvider for SpecRegistry {
     /// Searches specs in reverse order so that later-loaded specs
     /// (project > user > built-in) take priority.
     fn lookup(&self, command: &str, word: &str) -> Option<(&str, &str)> {
-        // Search in reverse so later specs (higher priority) win.
         for spec in self.specs.iter().rev() {
-            if spec.commands.iter().any(|c| c == command) {
-                if let Some(sub) = spec.subcommands.get(word) {
-                    return Some((&sub.glyph, &sub.description));
-                }
+            if spec.commands.iter().any(|c| c == command)
+                && let Some(sub) = spec.subcommands.get(word)
+            {
+                return Some((&sub.glyph, &sub.description));
             }
         }
         None
@@ -162,10 +161,10 @@ impl DescriptionProvider for SpecRegistry {
     /// Get the prompt icon for a command from specs, or None.
     fn icon(&self, command: &str) -> Option<&str> {
         for spec in self.specs.iter().rev() {
-            if spec.commands.iter().any(|c| c == command) {
-                if let Some(ref icon) = spec.icon {
-                    return Some(icon.as_str());
-                }
+            if spec.commands.iter().any(|c| c == command)
+                && let Some(ref icon) = spec.icon
+            {
+                return Some(icon.as_str());
             }
         }
         None
@@ -274,10 +273,10 @@ pub fn load_specs_from_dir(path: &Path) -> Vec<CompletionSpec> {
 /// Expand `~` at the start of a path to `$HOME`.
 #[must_use]
 fn shellexpand_tilde(path: &str) -> String {
-    if let Some(rest) = path.strip_prefix('~') {
-        if let Ok(home) = std::env::var("HOME") {
-            return format!("{home}{rest}");
-        }
+    if let Some(rest) = path.strip_prefix('~')
+        && let Ok(home) = std::env::var("HOME")
+    {
+        return format!("{home}{rest}");
     }
     path.to_string()
 }

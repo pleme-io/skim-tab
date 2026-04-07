@@ -336,12 +336,12 @@ mod tests {
 
     #[test]
     fn kubeconfig_paths_from_env() {
-        std::env::set_var("KUBECONFIG", "/tmp/a:/tmp/b");
+        unsafe { std::env::set_var("KUBECONFIG", "/tmp/a:/tmp/b") };
         let paths = kubeconfig_paths();
         assert_eq!(paths.len(), 2);
         assert_eq!(paths[0], PathBuf::from("/tmp/a"));
         assert_eq!(paths[1], PathBuf::from("/tmp/b"));
-        std::env::remove_var("KUBECONFIG");
+        unsafe { std::env::remove_var("KUBECONFIG") };
     }
 
     #[test]
@@ -734,10 +734,10 @@ contexts: []
 
     #[test]
     fn kubeconfig_paths_single() {
-        std::env::set_var("KUBECONFIG", "/tmp/single");
+        unsafe { std::env::set_var("KUBECONFIG", "/tmp/single") };
         let paths = kubeconfig_paths();
         assert_eq!(paths.len(), 1);
         assert_eq!(paths[0], PathBuf::from("/tmp/single"));
-        std::env::remove_var("KUBECONFIG");
+        unsafe { std::env::remove_var("KUBECONFIG") };
     }
 }
