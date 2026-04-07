@@ -21,43 +21,61 @@ use std::io::{self, Read as _};
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/// A completion request received from the zsh widget or JSON stdin.
 #[derive(Deserialize)]
 pub struct CompletionRequest {
+    /// Completion candidates to present in the picker.
     pub candidates: Vec<Candidate>,
+    /// Initial query string for fuzzy filtering.
     #[serde(default)]
     pub query: String,
+    /// The command being completed (e.g. `"kubectl"`).
     #[serde(default)]
     pub command: String,
+    /// Full zsh `LBUFFER` text at the cursor.
     #[serde(default)]
     pub buffer: String,
+    /// Completion group names (used for group switching).
     #[serde(default)]
     pub groups: Vec<String>,
+    /// Key that triggers directory descent inside the picker.
     #[serde(default)]
     pub continuous_trigger: String,
 }
 
+/// A single completion candidate from zsh's `compadd` hook.
 #[derive(Deserialize, Clone, Default)]
 pub struct Candidate {
+    /// The completion word to insert.
     pub word: String,
+    /// Display text shown in the picker (falls back to `word`).
     #[serde(default)]
     pub display: String,
+    /// Completion group name (e.g. `"directory"`, `"file"`).
     #[serde(default)]
     pub group: String,
+    /// Numeric index of the completion group.
     #[serde(default)]
     pub group_index: usize,
+    /// Real directory prefix for file candidates (from `compadd -R`).
     #[serde(default)]
     pub realdir: String,
+    /// Whether this candidate represents a filesystem path.
     #[serde(default)]
     pub is_file: bool,
+    /// Matched prefix text before cursor.
     #[serde(default)]
     pub prefix: String,
+    /// Text after cursor that will be replaced (midword completion).
     #[serde(default)]
     pub suffix: String,
+    /// Invisible prefix prepended to the word (`compadd -I`).
     #[serde(default)]
     pub iprefix: String,
+    /// Invisible suffix appended to the word (`compadd -I`).
     #[serde(default)]
     pub isuffix: String,
-    /// Original zparseopts args, joined with \x01
+    /// Original `zparseopts` args, joined with `\x01`.
     #[serde(default)]
     pub args: String,
 }
@@ -101,23 +119,35 @@ impl Candidate {
     }
 }
 
+/// Response emitted after the skim picker closes.
 #[derive(Serialize)]
 pub struct CompletionResponse {
+    /// `"select"` when item(s) were chosen, `"abort"` on dismiss.
     pub action: &'static str,
+    /// The chosen completion words (empty on abort).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub selections: Vec<Selection>,
+    /// Final query text, if relevant.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<String>,
 }
 
+/// A selected completion item ready for insertion into zsh.
 #[derive(Serialize, Clone)]
 pub struct Selection {
+    /// The word to insert.
     pub word: String,
+    /// Matched prefix text (for midword replacement).
     pub prefix: String,
+    /// Suffix text after cursor to replace.
     pub suffix: String,
+    /// Invisible prefix.
     pub iprefix: String,
+    /// Invisible suffix.
     pub isuffix: String,
+    /// Original `compadd` args, `\x01`-separated.
     pub args: String,
+    /// Whether the selected word is a directory.
     pub is_dir: bool,
 }
 

@@ -5,15 +5,25 @@ use std::path::Path;
 /// Detected project type based on marker files in CWD.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProjectType {
-    Rust,      // Cargo.toml
-    Node,      // package.json
-    Python,    // pyproject.toml, setup.py, requirements.txt
-    Go,        // go.mod
-    Nix,       // flake.nix
-    Zig,       // build.zig
-    Ruby,      // Gemfile
-    Terraform, // main.tf
-    Helm,      // Chart.yaml
+    /// Rust project (`Cargo.toml`).
+    Rust,
+    /// Node.js project (`package.json`).
+    Node,
+    /// Python project (`pyproject.toml`, `setup.py`, `requirements.txt`).
+    Python,
+    /// Go project (`go.mod`).
+    Go,
+    /// Nix flake project (`flake.nix`).
+    Nix,
+    /// Zig project (`build.zig`).
+    Zig,
+    /// Ruby project (`Gemfile`).
+    Ruby,
+    /// Terraform project (`main.tf`).
+    Terraform,
+    /// Helm chart project (`Chart.yaml`).
+    Helm,
+    /// No recognized project markers found.
     Unknown,
 }
 
