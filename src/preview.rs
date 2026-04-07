@@ -155,6 +155,7 @@ fn detect_preview_type(command: &str, buffer: &str, word: &str, realdir: &str) -
 const DEFAULT_MAX_LINES: usize = 30;
 
 /// Generate a preview string for a completion candidate.
+#[must_use]
 pub fn preview(word: &str, command: &str, buffer: &str, realdir: &str) -> String {
     let ctx = BufferContext::parse(buffer, command);
 
