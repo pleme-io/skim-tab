@@ -7,6 +7,20 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use rusqlite::{params, Connection};
+use thiserror::Error;
+
+/// Errors that can occur in the history subsystem.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum HistoryError {
+    /// SQLite operation failed.
+    #[error("sqlite error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+
+    /// Failed to create the database directory.
+    #[error("failed to create database directory: {0}")]
+    CreateDir(#[from] std::io::Error),
+}
 
 // ── Frecency scoring ─────────────────────────────────────────────────
 
@@ -49,10 +63,10 @@ impl HistoryDb {
     /// Open (or create) the selection history database.
     ///
     /// Default path: `~/.local/share/skim-tab/selections.db`
-    pub fn open() -> Result<Self, rusqlite::Error> {
+    pub fn open() -> Result<Self, HistoryError> {
         let path = Self::db_path();
         if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            std::fs::create_dir_all(parent)?;
         }
         let conn = Connection::open(&path)?;
         conn.execute_batch(
@@ -72,7 +86,7 @@ impl HistoryDb {
     }
 
     /// Record a selection event.
-    pub fn record(&self, command: &str, cwd: &str, word: &str) -> Result<(), rusqlite::Error> {
+    pub fn record(&self, command: &str, cwd: &str, word: &str) -> Result<(), HistoryError> {
         self.conn.execute(
             "INSERT INTO selections (command, cwd, word) VALUES (?1, ?2, ?3)",
             params![command, cwd, word],
@@ -89,7 +103,7 @@ impl HistoryDb {
         &self,
         command: &str,
         cwd: &str,
-    ) -> Result<HashMap<String, f64>, rusqlite::Error> {
+    ) -> Result<HashMap<String, f64>, HistoryError> {
         let mut stmt = self.conn.prepare(
             "SELECT word, (julianday('now') - julianday(timestamp, 'unixepoch')) AS days_ago
              FROM selections
@@ -113,7 +127,7 @@ impl HistoryDb {
     }
 
     /// Delete entries older than `max_age_days`.
-    pub fn cleanup(&self, max_age_days: u32) -> Result<usize, rusqlite::Error> {
+    pub fn cleanup(&self, max_age_days: u32) -> Result<usize, HistoryError> {
         let deleted = self.conn.execute(
             "DELETE FROM selections WHERE timestamp < unixepoch() - ?1 * 86400",
             params![max_age_days],
@@ -508,5 +522,28 @@ mod tests {
         store.record("git", "/repo", "commit").unwrap();
         let scores = store.frecency_scores("git", "/repo").unwrap();
         assert!(scores.contains_key("commit"));
+    }
+
+    // ── HistoryError ─────────────────────────────────────────────────
+
+    #[test]
+    fn history_error_display_sqlite() {
+        let err = HistoryError::Sqlite(rusqlite::Error::QueryReturnedNoRows);
+        let msg = err.to_string();
+        assert!(msg.contains("sqlite"), "should mention sqlite: {msg}");
+    }
+
+    #[test]
+    fn history_error_display_create_dir() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "no perms");
+        let err = HistoryError::CreateDir(io_err);
+        let msg = err.to_string();
+        assert!(msg.contains("directory"), "should mention directory: {msg}");
+    }
+
+    #[test]
+    fn history_error_from_rusqlite() {
+        let sqlite_err = rusqlite::Error::QueryReturnedNoRows;
+        let _: HistoryError = sqlite_err.into();
     }
 }

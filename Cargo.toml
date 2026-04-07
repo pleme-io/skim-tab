@@ -64,6 +64,7 @@ serde_yaml = "0.9"
 shikumi = { git = "https://github.com/pleme-io/shikumi" }
 rusqlite = { version = "0.32", features = ["bundled"] }
 crossterm = "0.29"
+thiserror = "2.0.18"
 
 [dev-dependencies]
 tempfile = "3"
