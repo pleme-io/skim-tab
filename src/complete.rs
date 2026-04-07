@@ -177,14 +177,13 @@ fn parse_compcap(data: &[u8], command: &str, query: &str, buffer: &str) -> Compl
             0
         };
 
-        let mut i = start;
-        while i + 1 < parts.len() {
-            let key = String::from_utf8_lossy(parts[i]).to_string();
-            let value = String::from_utf8_lossy(parts[i + 1]).to_string();
-            if !key.is_empty() {
-                map.insert(key, value);
+        for pair in parts[start..].chunks(2) {
+            if pair.len() == 2 {
+                let key = String::from_utf8_lossy(pair[0]);
+                if !key.is_empty() {
+                    map.insert(key.into_owned(), String::from_utf8_lossy(pair[1]).into_owned());
+                }
             }
-            i += 2;
         }
 
         let has_realdir = map.contains_key("realdir");
