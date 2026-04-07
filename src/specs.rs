@@ -227,6 +227,7 @@ impl DescriptionProvider for MockDescriptionProvider {
 
 /// Read all `.yaml` and `.yml` files from a directory and parse them as
 /// completion specs.
+#[must_use]
 pub fn load_specs_from_dir(path: &Path) -> Vec<CompletionSpec> {
     let mut specs = Vec::new();
 

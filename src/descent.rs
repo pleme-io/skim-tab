@@ -21,6 +21,7 @@ use super::complete::{Candidate, Selection};
 // ── Path helpers ─────────────────────────────────────────────────────
 
 /// Expand `~` to `$HOME`.
+#[must_use]
 pub fn expand_home(path: &str) -> String {
     if path.starts_with('~') {
         std::env::var("HOME")
@@ -33,6 +34,7 @@ pub fn expand_home(path: &str) -> String {
 
 /// Resolve the filesystem path for a candidate.
 /// Descent candidates have `realdir=""` and `word` is the full relative path.
+#[must_use]
 pub fn candidate_fs_path(c: &Candidate) -> String {
     let raw = if c.realdir.is_empty() {
         c.word.clone()
@@ -43,6 +45,7 @@ pub fn candidate_fs_path(c: &Candidate) -> String {
 }
 
 /// Check if a candidate is a directory on the filesystem.
+#[must_use]
 pub fn is_dir_candidate(c: &Candidate) -> bool {
     c.is_file && Path::new(&candidate_fs_path(c)).is_dir()
 }
@@ -54,6 +57,7 @@ pub fn is_dir_candidate(c: &Candidate) -> bool {
 /// `base_dir` is the filesystem path to read.
 /// `prefix_path` is the accumulated user-visible path prefix (e.g., `.git/hooks/`).
 /// `dirs_only` filters to directories (for cd/pushd/z/rmdir).
+#[must_use]
 pub fn readdir_candidates(base_dir: &str, prefix_path: &str, dirs_only: bool) -> Vec<Candidate> {
     let Ok(entries) = std::fs::read_dir(base_dir) else {
         return vec![];
