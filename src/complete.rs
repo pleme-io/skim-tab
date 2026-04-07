@@ -2197,4 +2197,319 @@ mod tests {
             .collect();
         assert_eq!(parse_kv_arg(&args, "--cmd"), "first");
     }
+
+    // ── CompletionRequest deserialization edge cases ──────────────────
+
+    #[test]
+    fn deserialize_request_minimal() {
+        let json = r#"{"candidates":[]}"#;
+        let req: CompletionRequest = serde_json::from_str(json).unwrap();
+        assert!(req.candidates.is_empty());
+        assert!(req.command.is_empty());
+        assert!(req.query.is_empty());
+        assert!(req.buffer.is_empty());
+        assert!(req.groups.is_empty());
+        assert!(req.continuous_trigger.is_empty());
+    }
+
+    #[test]
+    fn deserialize_request_with_groups() {
+        let json = r#"{"candidates":[],"groups":["files","flags","subcommands"]}"#;
+        let req: CompletionRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.groups.len(), 3);
+        assert_eq!(req.groups[0], "files");
+    }
+
+    #[test]
+    fn deserialize_candidate_defaults() {
+        let json = r#"{"word":"test"}"#;
+        let c: Candidate = serde_json::from_str(json).unwrap();
+        assert_eq!(c.word, "test");
+        assert!(c.display.is_empty());
+        assert!(c.group.is_empty());
+        assert_eq!(c.group_index, 0);
+        assert!(c.realdir.is_empty());
+        assert!(!c.is_file);
+        assert!(c.prefix.is_empty());
+        assert!(c.suffix.is_empty());
+        assert!(c.iprefix.is_empty());
+        assert!(c.isuffix.is_empty());
+        assert!(c.args.is_empty());
+    }
+
+    // ── Selection serialization ───────────────────────────────────────
+
+    #[test]
+    fn serialize_selection_roundtrip() {
+        let sel = Selection {
+            word: "pods".into(),
+            prefix: "po".into(),
+            suffix: "ds".into(),
+            iprefix: "".into(),
+            isuffix: "".into(),
+            args: "-Q".into(),
+            is_dir: false,
+        };
+        let json = serde_json::to_string(&sel).unwrap();
+        assert!(json.contains("\"word\":\"pods\""));
+        assert!(json.contains("\"prefix\":\"po\""));
+        assert!(json.contains("\"suffix\":\"ds\""));
+        assert!(json.contains("\"is_dir\":false"));
+    }
+
+    #[test]
+    fn serialize_response_multiple_selections() {
+        let resp = CompletionResponse {
+            action: "select",
+            selections: vec![
+                Selection {
+                    word: "a".into(),
+                    prefix: "".into(),
+                    suffix: "".into(),
+                    iprefix: "".into(),
+                    isuffix: "".into(),
+                    args: "".into(),
+                    is_dir: false,
+                },
+                Selection {
+                    word: "b".into(),
+                    prefix: "".into(),
+                    suffix: "".into(),
+                    iprefix: "".into(),
+                    isuffix: "".into(),
+                    args: "".into(),
+                    is_dir: true,
+                },
+            ],
+            query: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"action\":\"select\""));
+        assert!(json.contains("\"word\":\"a\""));
+        assert!(json.contains("\"word\":\"b\""));
+    }
+
+    // ── colorize dispatch: all 12 spec commands ───────────────────────
+
+    #[test]
+    fn colorize_enriches_docker_subcommand() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let result = colorize("run", &c, &ls, "docker", &K8sEnrichment::default(), &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("Run a container"));
+    }
+
+    #[test]
+    fn colorize_enriches_git_subcommand() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let result = colorize("commit", &c, &ls, "git", &K8sEnrichment::default(), &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("Record changes"));
+    }
+
+    #[test]
+    fn colorize_enriches_cargo_subcommand() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let result = colorize("build", &c, &ls, "cargo", &K8sEnrichment::default(), &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("Compile the current package"));
+    }
+
+    #[test]
+    fn colorize_enriches_npm_subcommand() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let result = colorize("install", &c, &ls, "npm", &K8sEnrichment::default(), &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains(" -- "));
+    }
+
+    #[test]
+    fn colorize_enriches_terraform_subcommand() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let result = colorize("plan", &c, &ls, "terraform", &K8sEnrichment::default(), &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("Show execution plan"));
+    }
+
+    #[test]
+    fn colorize_enriches_aws_subcommand() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let result = colorize("s3", &c, &ls, "aws", &K8sEnrichment::default(), &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("Object storage"));
+    }
+
+    #[test]
+    fn colorize_enriches_nix_subcommand() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let result = colorize("build", &c, &ls, "nix", &K8sEnrichment::default(), &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("Build a derivation"));
+    }
+
+    // ── colorize: existing description is preserved ───────────────────
+
+    #[test]
+    fn colorize_does_not_double_enrich() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let result = colorize("get -- Display resources", &c, &ls, "kubectl", &K8sEnrichment::default(), &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert_eq!(stripped, "get -- Display resources");
+        assert_eq!(stripped.matches(" -- ").count(), 1, "should not double-add description");
+    }
+
+    // ── colorize with podman alias ────────────────────────────────────
+
+    #[test]
+    fn colorize_enriches_podman_alias() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let result = colorize("build", &c, &ls, "podman", &K8sEnrichment::default(), &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("Build an image"));
+    }
+
+    // ── K8sEnrichment: combined resource counts + namespace ──────────
+
+    #[test]
+    fn colorize_combines_resource_count_and_description() {
+        let ls = LsColors::default();
+        let reg = test_registry();
+        let c = Candidate::default();
+        let k8s = K8sEnrichment {
+            resource_counts: HashMap::from([
+                ("deploy".to_string(), 5),
+                ("services".to_string(), 3),
+            ]),
+            ..Default::default()
+        };
+        let result = colorize("deploy", &c, &ls, "kubectl", &k8s, &reg);
+        let stripped = crate::strip_ansi(&result);
+        assert!(stripped.contains("Managed replicas"));
+        assert!(stripped.contains("5"));
+    }
+
+    // ── parse_compcap: group index extraction ─────────────────────────
+
+    #[test]
+    fn parse_compcap_extracts_group_index() {
+        let entry = b"item\x02<\x00>\x00group\x001\x00word\x00item";
+        let req = parse_compcap(entry, "cmd", "", "cmd ");
+        assert_eq!(req.candidates[0].group_index, 1);
+    }
+
+    #[test]
+    fn parse_compcap_group_index_non_numeric_defaults_to_zero() {
+        let entry = b"item\x02<\x00>\x00group\x00files\x00word\x00item";
+        let req = parse_compcap(entry, "cmd", "", "cmd ");
+        assert_eq!(req.candidates[0].group_index, 0);
+    }
+
+    // ── K8sEnrichment: namespace inactive with pods ───────────────────
+
+    #[test]
+    fn build_description_inactive_ns_with_pods() {
+        let reg = test_registry();
+        let k8s = K8sEnrichment {
+            ns_pod_counts: HashMap::from([("kube-system".to_string(), 15)]),
+            active_ns: "default".to_string(),
+            ..Default::default()
+        };
+        let desc = build_description("kube-system", "kubectl", &k8s, &reg);
+        assert!(desc.is_some());
+        assert!(desc.as_ref().unwrap().contains("15 pods"));
+        assert!(!desc.unwrap().contains("active"));
+    }
+
+    #[test]
+    fn build_description_active_ns_without_pods() {
+        let reg = test_registry();
+        let k8s = K8sEnrichment {
+            ns_pod_counts: HashMap::new(),
+            active_ns: "myns".to_string(),
+            ..Default::default()
+        };
+        let desc = build_description("myns", "kubectl", &k8s, &reg);
+        assert!(desc.is_some());
+        assert_eq!(desc.unwrap(), "active");
+    }
+
+    // ── completion_base_cmd: multi-word buffer ────────────────────────
+
+    #[test]
+    fn completion_base_cmd_strips_args() {
+        assert_eq!(completion_base_cmd("", "git commit -m 'msg'"), "git");
+    }
+
+    #[test]
+    fn completion_base_cmd_pipe_buffer() {
+        assert_eq!(completion_base_cmd("", "kubectl get pods | grep"), "kubectl");
+    }
+
+    // ── Eval output format validation ─────────────────────────────────
+
+    #[test]
+    fn eval_response_execute_flag() {
+        let sel = Selection {
+            word: "commit".into(),
+            prefix: "".into(),
+            suffix: "".into(),
+            iprefix: "".into(),
+            isuffix: "".into(),
+            args: "".into(),
+            is_dir: false,
+        };
+        let dir_flag = if sel.is_dir { "d" } else { "" };
+        let exec_flag = "x";
+        let line = format!(
+            "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
+            sel.word, sel.prefix, sel.suffix,
+            sel.iprefix, sel.isuffix, sel.args,
+            dir_flag, exec_flag
+        );
+        let fields: Vec<&str> = line.split('\x1f').collect();
+        assert_eq!(fields.len(), 8);
+        assert_eq!(fields[7], "x");
+    }
+
+    #[test]
+    fn eval_response_dir_and_execute_flags_combined() {
+        let sel = Selection {
+            word: "scripts/".into(),
+            prefix: "".into(),
+            suffix: "".into(),
+            iprefix: "".into(),
+            isuffix: "".into(),
+            args: "".into(),
+            is_dir: true,
+        };
+        let dir_flag = if sel.is_dir { "d" } else { "" };
+        let exec_flag = "x";
+        let line = format!(
+            "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
+            sel.word, sel.prefix, sel.suffix,
+            sel.iprefix, sel.isuffix, sel.args,
+            dir_flag, exec_flag
+        );
+        let fields: Vec<&str> = line.split('\x1f').collect();
+        assert_eq!(fields[6], "d");
+        assert_eq!(fields[7], "x");
+    }
 }
