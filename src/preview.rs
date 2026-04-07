@@ -116,17 +116,15 @@ fn detect_preview_type(command: &str, buffer: &str, word: &str, realdir: &str) -
     // and base_cmd format (git with sub(0) = checkout)
     let git_sub = if ctx.base_cmd == "git" {
         ctx.sub(0)
-    } else if command.starts_with("git-") {
-        &command[4..]
     } else {
-        ""
+        command.strip_prefix("git-").unwrap_or_default()
     };
 
     match git_sub {
-        "checkout" | "switch" | "merge" | "rebase" | "log" => {
-            if !word.contains('/') || !Path::new(word).exists() {
-                return PreviewType::GitBranch(word.to_string());
-            }
+        "checkout" | "switch" | "merge" | "rebase" | "log"
+            if !word.contains('/') || !Path::new(word).exists() =>
+        {
+            return PreviewType::GitBranch(word.to_string());
         }
         "add" | "diff" | "restore" | "reset" | "stash" => {
             return PreviewType::GitFile(word.to_string());

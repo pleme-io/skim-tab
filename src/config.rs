@@ -47,18 +47,11 @@ use shikumi::{ConfigDiscovery, Format, ProviderChain};
 // ── Top-level config ────────────────────────────────────────────────
 
 /// Root configuration for skim-tab.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    /// Completion subsystem configuration.
     pub completion: CompletionConfig,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            completion: CompletionConfig::default(),
-        }
-    }
 }
 
 // ── Completion config ───────────────────────────────────────────────
