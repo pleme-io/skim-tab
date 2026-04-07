@@ -381,7 +381,7 @@ fn lookup_description(word: &str, command: &str, registry: &dyn DescriptionProvi
 ///
 /// Normalizes trailing space: icons without a trailing space get one appended.
 #[must_use]
-fn tool_icon<'a>(command: &str, registry: &'a dyn DescriptionProvider) -> Option<String> {
+fn tool_icon(command: &str, registry: &dyn DescriptionProvider) -> Option<String> {
     registry.icon(command).map(|icon| {
         if icon.ends_with(' ') {
             icon.to_string()

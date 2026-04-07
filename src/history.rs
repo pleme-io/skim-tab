@@ -89,7 +89,7 @@ fn read_history() -> Result<Vec<String>> {
     }
 
     let mut entries: Vec<(String, usize)> = seen.into_iter().collect();
-    entries.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    entries.sort_unstable_by_key(|e| std::cmp::Reverse(e.1));
 
     Ok(entries.into_iter().map(|(cmd, _)| cmd).collect())
 }
