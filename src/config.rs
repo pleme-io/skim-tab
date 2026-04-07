@@ -116,10 +116,11 @@ impl Default for CompletionConfig {
 // ── Completion mode ─────────────────────────────────────────────────
 
 /// How completion candidates are sourced.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CompletionMode {
     /// Poll live sources directly (kubectl, fs, history). Default.
+    #[default]
     Direct,
     /// Complete from gRPC indexing service only.
     Service,
