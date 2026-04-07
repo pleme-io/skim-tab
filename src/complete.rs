@@ -357,17 +357,13 @@ fn color_description(desc: &str) -> String {
 #[must_use]
 fn lookup_description(word: &str, command: &str, registry: &dyn DescriptionProvider) -> Option<String> {
     let base = command.split(':').next().unwrap_or(command);
-
-    if let Some((glyph, desc)) = registry.lookup(base, word) {
-        let formatted = if glyph.is_empty() {
+    registry.lookup(base, word).map(|(glyph, desc)| {
+        if glyph.is_empty() {
             desc.to_owned()
         } else {
             format!("{glyph} {desc}")
-        };
-        return Some(formatted);
-    }
-
-    None
+        }
+    })
 }
 
 /// Get the prompt icon for a command, or None for the default.
