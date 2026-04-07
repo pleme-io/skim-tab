@@ -127,4 +127,60 @@ mod tests {
     fn parse_rg_rejects_empty_line() {
         assert!(parse_rg_match("file::content").is_none());
     }
+
+    // ── parse_rg_match edge cases ────────────────────────────────────
+
+    #[test]
+    fn parse_rg_match_large_line_number() {
+        let (file, line) = parse_rg_match("file.rs:9999999999:content").unwrap();
+        assert_eq!(file, "file.rs");
+        assert_eq!(line, "9999999999");
+    }
+
+    #[test]
+    fn parse_rg_match_line_number_too_long() {
+        // 11+ digit line numbers rejected (len > 10)
+        assert!(parse_rg_match("file.rs:12345678901:content").is_none());
+    }
+
+    #[test]
+    fn parse_rg_match_path_with_dots() {
+        let (file, line) = parse_rg_match("src/k8s.rs:100:fn test()").unwrap();
+        assert_eq!(file, "src/k8s.rs");
+        assert_eq!(line, "100");
+    }
+
+    #[test]
+    fn parse_rg_match_empty_file() {
+        // Empty file path portion
+        let result = parse_rg_match(":42:content");
+        // First field is empty string, but line is valid
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), ("", "42"));
+    }
+
+    #[test]
+    fn parse_rg_match_no_content() {
+        // file:line: with empty content portion
+        let (file, line) = parse_rg_match("file.rs:42:").unwrap();
+        assert_eq!(file, "file.rs");
+        assert_eq!(line, "42");
+    }
+
+    #[test]
+    fn parse_rg_match_single_colon() {
+        assert!(parse_rg_match("only_one_colon:content").is_none());
+    }
+
+    #[test]
+    fn parse_rg_match_no_colons() {
+        assert!(parse_rg_match("nocolonsatall").is_none());
+    }
+
+    #[test]
+    fn preview_command_has_required_placeholders() {
+        let cmd = preview_command();
+        assert!(cmd.contains("{1}"), "should have file placeholder");
+        assert!(cmd.contains("{2}"), "should have line placeholder");
+    }
 }
