@@ -756,4 +756,268 @@ subcommands:
             assert!(!spec.subcommands.is_empty(), "{name} has no subcommands");
         }
     }
+
+    // ── Per-spec YAML parser tests ────────────────────────────────────
+
+    #[test]
+    fn parse_git_yaml() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[3].1).expect("git.yaml should parse");
+        assert!(spec.commands.contains(&"git".to_string()));
+        assert!(spec.subcommands.contains_key("commit"));
+        assert!(spec.subcommands.contains_key("push"));
+        assert!(spec.subcommands.contains_key("stash"));
+        assert!(spec.subcommands.contains_key("cherry-pick"));
+        assert!(spec.icon.is_some());
+    }
+
+    #[test]
+    fn parse_cargo_yaml() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[2].1).expect("cargo.yaml should parse");
+        assert!(spec.commands.contains(&"cargo".to_string()));
+        assert!(spec.subcommands.contains_key("build"));
+        assert!(spec.subcommands.contains_key("test"));
+        assert!(spec.subcommands.contains_key("clippy"));
+        assert!(spec.subcommands.contains_key("nextest"));
+    }
+
+    #[test]
+    fn parse_npm_yaml() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[4].1).expect("npm.yaml should parse");
+        assert!(spec.commands.contains(&"npm".to_string()));
+        assert!(spec.commands.contains(&"pnpm".to_string()));
+        assert!(spec.commands.contains(&"yarn".to_string()));
+        assert!(spec.subcommands.contains_key("install"));
+        assert!(spec.subcommands.contains_key("run"));
+    }
+
+    #[test]
+    fn parse_terraform_yaml() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[5].1).expect("terraform.yaml should parse");
+        assert!(spec.commands.contains(&"terraform".to_string()));
+        assert!(spec.commands.contains(&"tofu".to_string()));
+        assert!(spec.subcommands.contains_key("plan"));
+        assert!(spec.subcommands.contains_key("apply"));
+        assert!(spec.subcommands.contains_key("destroy"));
+    }
+
+    #[test]
+    fn parse_aws_yaml() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[6].1).expect("aws.yaml should parse");
+        assert!(spec.commands.contains(&"aws".to_string()));
+        assert!(spec.subcommands.contains_key("s3"));
+        assert!(spec.subcommands.contains_key("ec2"));
+        assert!(spec.subcommands.contains_key("iam"));
+        assert!(spec.subcommands.contains_key("lambda"));
+    }
+
+    #[test]
+    fn parse_gcloud_yaml() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[7].1).expect("gcloud.yaml should parse");
+        assert!(spec.commands.contains(&"gcloud".to_string()));
+        assert!(spec.subcommands.contains_key("compute"));
+        assert!(spec.subcommands.contains_key("container"));
+    }
+
+    #[test]
+    fn parse_az_yaml() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[8].1).expect("az.yaml should parse");
+        assert!(spec.commands.contains(&"az".to_string()));
+        assert!(spec.subcommands.contains_key("vm"));
+        assert!(spec.subcommands.contains_key("aks"));
+    }
+
+    // ── Nested subcommand lookup ──────────────────────────────────────
+
+    #[test]
+    fn nix_flake_nested_subcommand_structure() {
+        let spec: CompletionSpec =
+            serde_yaml::from_str(BUILTIN_SPECS[1].1).expect("nix.yaml should parse");
+        let flake = spec.subcommands.get("flake").expect("should have flake");
+        assert!(!flake.description.is_empty());
+        assert!(flake.subcommands.contains_key("update"));
+        assert!(flake.subcommands.contains_key("check"));
+        assert!(flake.subcommands.contains_key("show"));
+        let update = flake.subcommands.get("update").unwrap();
+        assert!(!update.description.is_empty());
+    }
+
+    // ── Spec subcommand field validation ──────────────────────────────
+
+    #[test]
+    fn all_builtin_subcommands_have_descriptions() {
+        for (name, content) in BUILTIN_SPECS {
+            let spec: CompletionSpec = serde_yaml::from_str(content)
+                .unwrap_or_else(|e| panic!("failed to parse {name}: {e}"));
+            for (sub_name, sub) in &spec.subcommands {
+                assert!(
+                    !sub.description.is_empty(),
+                    "{name}: subcommand '{sub_name}' has no description"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn all_builtin_subcommands_have_glyphs() {
+        for (name, content) in BUILTIN_SPECS {
+            let spec: CompletionSpec = serde_yaml::from_str(content)
+                .unwrap_or_else(|e| panic!("failed to parse {name}: {e}"));
+            for (sub_name, sub) in &spec.subcommands {
+                assert!(
+                    !sub.glyph.is_empty(),
+                    "{name}: subcommand '{sub_name}' has no glyph"
+                );
+            }
+        }
+    }
+
+    // ── Lookup across all non-K8s specs ────────────────────────────────
+
+    #[test]
+    fn lookup_git_commit() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        let result = reg.lookup("git", "commit");
+        assert!(result.is_some());
+        let (glyph, desc) = result.unwrap();
+        assert_eq!(desc, "Record changes");
+        assert!(!glyph.is_empty());
+    }
+
+    #[test]
+    fn lookup_cargo_test() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        let result = reg.lookup("cargo", "test");
+        assert!(result.is_some());
+        let (_, desc) = result.unwrap();
+        assert_eq!(desc, "Run the tests");
+    }
+
+    #[test]
+    fn lookup_npm_install() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        let result = reg.lookup("npm", "install");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn lookup_npm_alias_pnpm() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        let result = reg.lookup("pnpm", "install");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn lookup_npm_alias_yarn() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        let result = reg.lookup("yarn", "install");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn lookup_terraform_plan() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        let result = reg.lookup("terraform", "plan");
+        assert!(result.is_some());
+        let (_, desc) = result.unwrap();
+        assert_eq!(desc, "Show execution plan");
+    }
+
+    #[test]
+    fn lookup_tofu_alias() {
+        let reg = SpecRegistry::new(&default_specs_config());
+        let result = reg.lookup("tofu", "apply");
+        assert!(result.is_some());
+        let (_, desc) = result.unwrap();
+        assert_eq!(desc, "Apply changes");
+    }
+
+    // ── load_specs_from_dir: multiple valid files ──────────────────────
+
+    #[test]
+    fn load_specs_from_dir_multiple_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let yaml1 = "commands: [tool1]\nsubcommands:\n  sub1:\n    description: desc1\n    glyph: \">\"\n";
+        let yaml2 = "commands: [tool2]\nsubcommands:\n  sub2:\n    description: desc2\n    glyph: \"<\"\n";
+        std::fs::write(dir.path().join("a.yaml"), yaml1).unwrap();
+        std::fs::write(dir.path().join("b.yml"), yaml2).unwrap();
+        let specs = load_specs_from_dir(dir.path());
+        assert_eq!(specs.len(), 2);
+        let all_cmds: Vec<&str> = specs
+            .iter()
+            .flat_map(|s| s.commands.iter().map(String::as_str))
+            .collect();
+        assert!(all_cmds.contains(&"tool1"));
+        assert!(all_cmds.contains(&"tool2"));
+    }
+
+    // ── Spec with flags ───────────────────────────────────────────────
+
+    #[test]
+    fn parse_spec_with_flags() {
+        let yaml = r#"
+commands: [mytool]
+subcommands:
+  run:
+    description: Run something
+    glyph: "▸"
+    flags:
+      --verbose: "Increase verbosity"
+      --dry-run: "Preview without executing"
+flags:
+  --help: "Show help"
+  --version: "Show version"
+"#;
+        let spec: CompletionSpec = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(spec.flags.len(), 2);
+        assert!(spec.flags.contains_key("--help"));
+        let run = spec.subcommands.get("run").unwrap();
+        assert_eq!(run.flags.len(), 2);
+        assert!(run.flags.contains_key("--verbose"));
+    }
+
+    // ── Empty/minimal YAML parses ─────────────────────────────────────
+
+    #[test]
+    fn parse_minimal_spec() {
+        let yaml = "commands: [x]\n";
+        let spec: CompletionSpec = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(spec.commands, vec!["x"]);
+        assert!(spec.subcommands.is_empty());
+        assert!(spec.flags.is_empty());
+        assert!(spec.icon.is_none());
+    }
+
+    // ── Registry with empty specs ─────────────────────────────────────
+
+    #[test]
+    fn empty_registry_returns_none_for_all() {
+        let reg = SpecRegistry { specs: vec![] };
+        assert!(reg.lookup("anything", "anything").is_none());
+        assert!(reg.icon("anything").is_none());
+        assert!(!reg.is_k8s_command("kubectl"));
+    }
+
+    // ── Spec count validation ─────────────────────────────────────────
+
+    #[test]
+    fn builtin_specs_count_is_12() {
+        assert_eq!(BUILTIN_SPECS.len(), 12);
+    }
+
+    #[test]
+    fn builtin_spec_filenames_end_with_yaml() {
+        for (name, _) in BUILTIN_SPECS {
+            assert!(
+                name.ends_with(".yaml"),
+                "spec name {name} should end with .yaml"
+            );
+        }
+    }
 }
