@@ -693,18 +693,22 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     let mut header_parts: Vec<String> = Vec::new();
 
     if cfg.completion.picker.show_group_header {
-        let mut group_names: Vec<&str> = Vec::new();
-        for c in &req.candidates {
-            if !c.group.is_empty() && !group_names.contains(&c.group.as_str()) {
-                group_names.push(&c.group);
-            }
-        }
+        let group_names: Vec<&str> = req
+            .candidates
+            .iter()
+            .map(|c| c.group.as_str())
+            .filter(|g| !g.is_empty())
+            .fold(Vec::new(), |mut acc, g| {
+                if !acc.contains(&g) {
+                    acc.push(g);
+                }
+                acc
+            });
         if group_names.len() > 1 {
-            let names = group_names.join(", ");
             header_parts.push(format!(
                 "{} groups: {} | F1/F2: switch",
                 group_names.len(),
-                names
+                group_names.join(", ")
             ));
         }
     }
@@ -804,38 +808,27 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         })
         .collect();
 
-    // ── R2a: continuous trigger — descend into directory ──────────
-    // If the trigger key (e.g., "/") was pressed and the selection is
-    // a single directory, enter the descent loop immediately.
-    if was_trigger && selections.len() == 1 && selections[0].is_dir
-        && let Some(sc) = req.candidates.iter().find(|c| {
-            let sel_word = &selections[0].word;
-            c.word == *sel_word || format!("{}/", c.word) == *sel_word
-        })
-    {
-        let final_sel = crate::descent::run_descent(
-            sc,
-            &selections[0],
-            &req.command,
-            matches!(output_mode, OutputMode::Eval),
-        );
-        print_response("select", &[final_sel], output_mode, false);
-        return;
-    }
+    // Descent into directory: triggered either by the continuous trigger key
+    // (R2a) or by legacy in_picker_descent config flag.
+    let should_descend = selections.len() == 1
+        && selections[0].is_dir
+        && (was_trigger || cfg.completion.in_picker_descent);
 
-    // Optional in-picker descent for single directory selection from multi-candidate
-    // (legacy behavior: descend on any dir select when in_picker_descent is enabled)
-    if cfg.completion.in_picker_descent && selections.len() == 1 && selections[0].is_dir
-        && let Some(sc) = req.candidates.iter().find(|c| {
-            let sel_word = &selections[0].word;
+    if should_descend {
+        let sel_word = &selections[0].word;
+        if let Some(sc) = req.candidates.iter().find(|c| {
             c.word == *sel_word || format!("{}/", c.word) == *sel_word
-        })
-    {
-        let final_sel = crate::descent::run_descent(sc, &selections[0], &req.command, matches!(output_mode, OutputMode::Eval));
-        print_response("select", &[final_sel], output_mode, false);
-        return;
+        }) {
+            let final_sel = crate::descent::run_descent(
+                sc,
+                &selections[0],
+                &req.command,
+                matches!(output_mode, OutputMode::Eval),
+            );
+            print_response("select", &[final_sel], output_mode, false);
+            return;
+        }
     }
-
     // ── History: record selections ────────────────────────────────
     if cfg.completion.enrichment.history_boost && !selections.is_empty()
         && let Some(ref db) = history_db
