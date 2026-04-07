@@ -148,26 +148,24 @@ impl DescriptionProvider for SpecRegistry {
     /// Searches specs in reverse order so that later-loaded specs
     /// (project > user > built-in) take priority.
     fn lookup(&self, command: &str, word: &str) -> Option<(&str, &str)> {
-        for spec in self.specs.iter().rev() {
-            if spec.commands.iter().any(|c| c == command)
-                && let Some(sub) = spec.subcommands.get(word)
-            {
-                return Some((&sub.glyph, &sub.description));
-            }
-        }
-        None
+        self.specs
+            .iter()
+            .rev()
+            .filter(|spec| spec.commands.iter().any(|c| c == command))
+            .find_map(|spec| {
+                spec.subcommands
+                    .get(word)
+                    .map(|sub| (sub.glyph.as_str(), sub.description.as_str()))
+            })
     }
 
     /// Get the prompt icon for a command from specs, or None.
     fn icon(&self, command: &str) -> Option<&str> {
-        for spec in self.specs.iter().rev() {
-            if spec.commands.iter().any(|c| c == command)
-                && let Some(ref icon) = spec.icon
-            {
-                return Some(icon.as_str());
-            }
-        }
-        None
+        self.specs
+            .iter()
+            .rev()
+            .filter(|spec| spec.commands.iter().any(|c| c == command))
+            .find_map(|spec| spec.icon.as_deref())
     }
 
     /// Check if a command is a Kubernetes-related tool.
