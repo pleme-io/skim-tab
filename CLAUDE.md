@@ -4,7 +4,7 @@
 
 ```bash
 cargo build          # compile
-cargo test           # 184+ tests across all binaries
+cargo test           # 453+ tests across all binaries
 cargo check          # type-check only
 ```
 
