@@ -14,6 +14,8 @@ pub mod k8s;
 pub mod preview;
 pub mod specs;
 
+use std::process::Command;
+
 use anyhow::{Context, Result};
 use skim::prelude::{SkimOptions, SkimOptionsBuilder};
 use skim::tui::options::TuiLayout;
@@ -174,6 +176,52 @@ pub fn base_options(query: &str) -> SkimOptionsBuilder {
 /// descriptive error instead of panicking.
 pub fn build_options(builder: &mut SkimOptionsBuilder) -> Result<SkimOptions> {
     builder.build().context("failed to build skim options")
+}
+
+// ── fd discovery ────────────────────────────────────────────────────
+
+/// What `fd` should search for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum FdTarget {
+    /// Only directories (`--type d`).
+    Directories,
+    /// Only files (`--type f`).
+    Files,
+    /// Both files and directories.
+    FilesAndDirs,
+}
+
+/// Standard exclusion dirs shared by all `fd` callers.
+const FD_EXCLUDES: &[&str] = &[".git", "node_modules", "target", "__pycache__", ".direnv"];
+
+/// Run `fd` with standard exclusions and return its stdout.
+///
+/// All three file-discovery binaries (cd, files, fvim) share the same
+/// `fd` invocation pattern. This centralizes it.
+pub fn fd_discover(target: FdTarget) -> Result<String> {
+    let mut cmd = Command::new("fd");
+
+    match target {
+        FdTarget::Directories => {
+            cmd.args(["--type", "d"]);
+        }
+        FdTarget::Files => {
+            cmd.args(["--type", "f"]);
+        }
+        FdTarget::FilesAndDirs => {
+            cmd.args(["--type", "f", "--type", "d"]);
+        }
+    }
+
+    cmd.args(["--hidden", "--follow"]);
+    for excl in FD_EXCLUDES {
+        cmd.args(["--exclude", excl]);
+    }
+    cmd.arg("--strip-cwd-prefix");
+
+    let output = cmd.output().context("failed to run fd — is it installed?")?;
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 #[cfg(test)]
@@ -392,6 +440,19 @@ mod tests {
         ] {
             assert!(val.starts_with('\x1b'), "{name} should start with ESC");
         }
+    }
+
+    #[test]
+    fn fd_target_variants_are_distinct() {
+        assert_ne!(FdTarget::Directories, FdTarget::Files);
+        assert_ne!(FdTarget::Files, FdTarget::FilesAndDirs);
+        assert_ne!(FdTarget::Directories, FdTarget::FilesAndDirs);
+    }
+
+    #[test]
+    fn fd_discover_runs_without_panic() {
+        // fd may not be in PATH in CI; just verify no panic
+        let _ = fd_discover(FdTarget::Files);
     }
 
     #[test]
