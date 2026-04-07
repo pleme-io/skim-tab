@@ -1,9 +1,12 @@
 //! Context intelligence — project detection and environment awareness.
 
+use std::fmt;
 use std::path::Path;
+use std::str::FromStr;
 
 /// Detected project type based on marker files in CWD.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ProjectType {
     /// Rust project (`Cargo.toml`).
     Rust,
@@ -27,10 +30,47 @@ pub enum ProjectType {
     Unknown,
 }
 
+impl fmt::Display for ProjectType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Rust => write!(f, "rust"),
+            Self::Node => write!(f, "node"),
+            Self::Python => write!(f, "python"),
+            Self::Go => write!(f, "go"),
+            Self::Nix => write!(f, "nix"),
+            Self::Zig => write!(f, "zig"),
+            Self::Ruby => write!(f, "ruby"),
+            Self::Terraform => write!(f, "terraform"),
+            Self::Helm => write!(f, "helm"),
+            Self::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+impl FromStr for ProjectType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "rust" => Ok(Self::Rust),
+            "node" => Ok(Self::Node),
+            "python" => Ok(Self::Python),
+            "go" => Ok(Self::Go),
+            "nix" => Ok(Self::Nix),
+            "zig" => Ok(Self::Zig),
+            "ruby" => Ok(Self::Ruby),
+            "terraform" => Ok(Self::Terraform),
+            "helm" => Ok(Self::Helm),
+            "unknown" => Ok(Self::Unknown),
+            other => Err(format!("unknown project type: {other}")),
+        }
+    }
+}
+
 /// Detect project type from marker files in the given directory.
+#[must_use]
 pub fn detect_project(dir: &Path) -> ProjectType {
-    // Check for marker files, most specific first
-    let markers = [
+    const MARKERS: &[(&str, ProjectType)] = &[
         ("Cargo.toml", ProjectType::Rust),
         ("flake.nix", ProjectType::Nix),
         ("go.mod", ProjectType::Go),
@@ -42,15 +82,15 @@ pub fn detect_project(dir: &Path) -> ProjectType {
         ("Chart.yaml", ProjectType::Helm),
         ("main.tf", ProjectType::Terraform),
     ];
-    for (file, proj_type) in &markers {
-        if dir.join(file).exists() {
-            return proj_type.clone();
-        }
-    }
-    ProjectType::Unknown
+    MARKERS
+        .iter()
+        .find(|(file, _)| dir.join(file).exists())
+        .map(|(_, proj_type)| proj_type.clone())
+        .unwrap_or(ProjectType::Unknown)
 }
 
 /// Get the current project type (detect from CWD).
+#[must_use]
 pub fn current_project() -> ProjectType {
     std::env::current_dir()
         .map(|d| detect_project(&d))
@@ -210,5 +250,34 @@ mod tests {
         let b = a.clone();
         assert_eq!(a, b);
         assert_ne!(ProjectType::Rust, ProjectType::Node);
+    }
+
+    // ── Display / FromStr round-trip ─────────────────────────────────
+
+    #[test]
+    fn project_type_display_fromstr_roundtrip() {
+        let variants = [
+            ProjectType::Rust,
+            ProjectType::Node,
+            ProjectType::Python,
+            ProjectType::Go,
+            ProjectType::Nix,
+            ProjectType::Zig,
+            ProjectType::Ruby,
+            ProjectType::Terraform,
+            ProjectType::Helm,
+            ProjectType::Unknown,
+        ];
+        for v in &variants {
+            let s = v.to_string();
+            let parsed: ProjectType = s.parse().unwrap();
+            assert_eq!(&parsed, v, "round-trip failed for {s}");
+        }
+    }
+
+    #[test]
+    fn project_type_fromstr_invalid() {
+        let result = "invalid".parse::<ProjectType>();
+        assert!(result.is_err());
     }
 }
