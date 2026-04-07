@@ -14,7 +14,8 @@ pub mod k8s;
 pub mod preview;
 pub mod specs;
 
-use skim::prelude::SkimOptionsBuilder;
+use anyhow::{Context, Result};
+use skim::prelude::{SkimOptions, SkimOptionsBuilder};
 use skim::tui::options::TuiLayout;
 
 /// Nord color palette for skim, used by all binaries.
@@ -82,6 +83,7 @@ pub const ANSI_PURPLE: &str = "\x1b[38;2;180;142;173m";
 pub const ANSI_RESET: &str = "\x1b[0m";
 
 /// Extract `--query <value>` from CLI args, returning empty string if absent.
+#[must_use]
 pub fn parse_query(args: &[String]) -> &str {
     args.iter()
         .position(|a| a == "--query")
@@ -91,6 +93,7 @@ pub fn parse_query(args: &[String]) -> &str {
 }
 
 /// Resolve the user's preferred editor: $EDITOR → $VISUAL → nvim.
+#[must_use]
 pub fn editor() -> String {
     std::env::var("EDITOR")
         .or_else(|_| std::env::var("VISUAL"))
@@ -99,6 +102,7 @@ pub fn editor() -> String {
 
 /// Shell-escape a string for safe embedding in a command.
 /// Simple paths pass through unquoted; anything with special chars gets single-quoted.
+#[must_use]
 pub fn shell_quote(s: &str) -> String {
     if s.chars()
         .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '.' | '-' | '_'))
@@ -110,6 +114,7 @@ pub fn shell_quote(s: &str) -> String {
 }
 
 /// Strip ANSI escape codes (CSI sequences and OSC) from a string.
+#[must_use]
 pub fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
@@ -149,6 +154,7 @@ pub fn strip_ansi(s: &str) -> String {
 
 /// Create a pre-configured `SkimOptionsBuilder` with Nord theme, standard
 /// binds, reverse layout, and common defaults. Callers customize further.
+#[must_use]
 pub fn base_options(query: &str) -> SkimOptionsBuilder {
     let mut builder = SkimOptionsBuilder::default();
     builder
@@ -162,6 +168,12 @@ pub fn base_options(query: &str) -> SkimOptionsBuilder {
         .color(NORD_COLORS.to_string())
         .bind(STANDARD_BINDS.iter().map(|s| (*s).to_string()).collect::<Vec<_>>());
     builder
+}
+
+/// Build a `SkimOptionsBuilder` into final `SkimOptions`, returning a
+/// descriptive error instead of panicking.
+pub fn build_options(builder: &mut SkimOptionsBuilder) -> Result<SkimOptions> {
+    builder.build().context("failed to build skim options")
 }
 
 #[cfg(test)]
@@ -224,6 +236,12 @@ mod tests {
     fn base_options_builds() {
         let opts = base_options("test").build();
         assert!(opts.is_ok());
+    }
+
+    #[test]
+    fn build_options_returns_ok() {
+        let result = build_options(&mut base_options("test"));
+        assert!(result.is_ok());
     }
 
     #[test]

@@ -13,7 +13,7 @@ use anyhow::{Context, Result};
 use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim::Skim;
-use skim_tab::{base_options, parse_query, ICON_HISTORY};
+use skim_tab::{base_options, build_options, parse_query, ICON_HISTORY};
 
 /// Parse a zsh extended history line.
 /// Format: `: TIMESTAMP:0;COMMAND` or just `COMMAND` (plain format).
@@ -107,13 +107,13 @@ fn main() -> Result<()> {
     let item_reader = SkimItemReader::default();
     let items = item_reader.of_bufread(io::Cursor::new(input));
 
-    let options = base_options(query)
-        .no_sort(true)
-        .scheme(MatchScheme::History)
-        .prompt(ICON_HISTORY.to_string())
-        .header("History | ESC: Cancel".to_string())
-        .build()
-        .expect("failed to build skim options");
+    let options = build_options(
+        base_options(query)
+            .no_sort(true)
+            .scheme(MatchScheme::History)
+            .prompt(ICON_HISTORY.to_string())
+            .header("History | ESC: Cancel".to_string()),
+    )?;
 
     match Skim::run_with(options, Some(items)) {
         Ok(out) if !out.is_abort => {
