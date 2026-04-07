@@ -7080,7 +7080,7 @@ rec {
       "skim-tab" = rec {
         crateName = "skim-tab";
         version = "0.1.0";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "skim-cd";
@@ -7175,6 +7175,10 @@ rec {
           {
             name = "skim";
             packageId = "skim";
+          }
+          {
+            name = "thiserror";
+            packageId = "thiserror 2.0.18";
           }
         ];
         devDependencies = [
