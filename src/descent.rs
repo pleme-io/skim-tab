@@ -10,7 +10,7 @@
 //! When disabled (default), directories are returned to zsh with a
 //! trailing `/` and the user tabs again for the next level.
 
-use crate::{base_options, ICON_CD};
+use crate::{base_options, expand_tilde, ICON_CD};
 use lscolors::LsColors;
 use skim::prelude::*;
 use std::io;
@@ -20,16 +20,10 @@ use super::complete::{Candidate, Selection};
 
 // ── Path helpers ─────────────────────────────────────────────────────
 
-/// Expand `~` to `$HOME`.
+/// Expand `~` to `$HOME`. Delegates to `crate::expand_tilde`.
 #[must_use]
 pub fn expand_home(path: &str) -> String {
-    if path.starts_with('~') {
-        std::env::var("HOME")
-            .map(|h| path.replacen('~', &h, 1))
-            .unwrap_or_else(|_| path.to_string())
-    } else {
-        path.to_string()
-    }
+    expand_tilde(path)
 }
 
 /// Resolve the filesystem path for a candidate.

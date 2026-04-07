@@ -178,6 +178,20 @@ pub fn build_options(builder: &mut SkimOptionsBuilder) -> Result<SkimOptions> {
     builder.build().context("failed to build skim options")
 }
 
+// ── Path helpers ────────────────────────────────────────────────────
+
+/// Expand `~` at the start of a path to `$HOME`. Other `~user` forms
+/// are not supported and pass through unchanged.
+#[must_use]
+pub fn expand_tilde(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix('~') {
+        if let Ok(home) = std::env::var("HOME") {
+            return format!("{home}{rest}");
+        }
+    }
+    path.to_string()
+}
+
 // ── fd discovery ────────────────────────────────────────────────────
 
 /// What `fd` should search for.
@@ -440,6 +454,26 @@ mod tests {
         ] {
             assert!(val.starts_with('\x1b'), "{name} should start with ESC");
         }
+    }
+
+    #[test]
+    fn expand_tilde_expands_home() {
+        let result = expand_tilde("~/foo/bar");
+        assert!(!result.starts_with('~'));
+        assert!(result.ends_with("/foo/bar"));
+    }
+
+    #[test]
+    fn expand_tilde_no_tilde() {
+        assert_eq!(expand_tilde("/absolute/path"), "/absolute/path");
+        assert_eq!(expand_tilde("relative"), "relative");
+    }
+
+    #[test]
+    fn expand_tilde_bare_tilde() {
+        let result = expand_tilde("~");
+        let home = std::env::var("HOME").unwrap_or_default();
+        assert_eq!(result, home);
     }
 
     #[test]
