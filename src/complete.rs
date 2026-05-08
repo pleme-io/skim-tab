@@ -512,7 +512,7 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     // Initialize the YAML spec registry with user config (lazy singleton —
     // first call wins, so we seed it here with the real config before any
     // lookup_description / tool_icon calls).
-    let registry = SpecRegistry::global(&cfg.completion.specs);
+    let static_registry = SpecRegistry::global(&cfg.completion.specs);
 
     // Single candidate: auto-select or show picker based on config
     if req.candidates.len() == 1 && cfg.completion.single_auto_select {
@@ -550,6 +550,21 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         LsColors::default()
     };
     let base_cmd = completion_base_cmd(&req.command, &req.buffer);
+
+    // ── Daemon-backed registry (when SKIM_TAB_DAEMON_SOCKET is alive) ──
+    // One round-trip prefetches icon + is_k8s + every candidate's lookup
+    // for `base_cmd`. All subsequent lookups during enrichment are local.
+    // Falls back to `static_registry` on any error.
+    let cached_provider: Option<crate::daemon::CachedProvider> =
+        crate::daemon::socket_if_alive().and_then(|sock| {
+            let words: Vec<&str> = req.candidates.iter().map(|c| c.word.as_str()).collect();
+            crate::daemon::prefetch(&sock, &base_cmd, &words).ok()
+        });
+    let registry: &dyn DescriptionProvider = match &cached_provider {
+        Some(c) => c,
+        None => static_registry,
+    };
+
     let is_k8s = registry.is_k8s_command(&base_cmd);
 
     // ── Enrichment: service mode (future gRPC client) ───────────

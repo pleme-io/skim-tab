@@ -140,6 +140,11 @@ impl SpecRegistry {
     pub fn global(specs_cfg: &config::SpecsConfig) -> &'static Self {
         GLOBAL_REGISTRY.get_or_init(|| Self::new(specs_cfg))
     }
+
+    /// Number of loaded specs (built-in + user + project).
+    pub fn spec_count(&self) -> usize {
+        self.specs.len()
+    }
 }
 
 impl DescriptionProvider for SpecRegistry {

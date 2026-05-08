@@ -8,6 +8,7 @@
 pub mod complete;
 pub mod config;
 pub mod context;
+pub mod daemon;
 pub mod descent;
 pub mod history_db;
 pub mod k8s;
@@ -21,6 +22,10 @@ use skim::prelude::{SkimOptions, SkimOptionsBuilder};
 use skim::tui::options::TuiLayout;
 
 /// Nord color palette for skim, used by all binaries.
+///
+/// Mirror: this string is byte-equivalent (modulo whitespace) to the output
+/// of `lib/skim-theme.nix` in the pleme-io/nix consumer repo. If you change
+/// one, change the other so every picker on the system looks the same.
 pub const NORD_COLORS: &str = "\
 fg:#D8DEE9,\
 bg:#2E3440,\
@@ -318,29 +323,29 @@ mod tests {
     }
 
     // ── editor() ─────────────────────────────────────────────────────
+    //
+    // The three EDITOR/VISUAL scenarios share process-global env state, so
+    // running them as separate `#[test]` functions races under cargo's
+    // default parallelism and inherits whatever EDITOR the shell exported.
+    // Folded into one sequential test so the asserts are deterministic.
 
     #[test]
-    fn editor_returns_env_editor() {
+    fn editor_resolves_env_visual_and_default() {
+        // Scenario 1: EDITOR set wins
         unsafe {
             std::env::set_var("EDITOR", "vim");
             std::env::remove_var("VISUAL");
         }
         assert_eq!(editor(), "vim");
-        unsafe { std::env::remove_var("EDITOR") };
-    }
 
-    #[test]
-    fn editor_falls_back_to_visual() {
+        // Scenario 2: only VISUAL set → falls back to VISUAL
         unsafe {
             std::env::remove_var("EDITOR");
             std::env::set_var("VISUAL", "code");
         }
         assert_eq!(editor(), "code");
-        unsafe { std::env::remove_var("VISUAL") };
-    }
 
-    #[test]
-    fn editor_defaults_to_nvim() {
+        // Scenario 3: neither set → final default nvim
         unsafe {
             std::env::remove_var("EDITOR");
             std::env::remove_var("VISUAL");
