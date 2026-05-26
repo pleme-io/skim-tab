@@ -7079,7 +7079,7 @@ rec {
       };
       "skim-tab" = rec {
         crateName = "skim-tab";
-        version = "0.1.0";
+        version = "0.1.1";
         edition = "2024";
         crateBin = [
           {
