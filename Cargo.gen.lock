@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "cargo_lock_sha256": "a5c2f404080bfb1521068ce597dd08d8f350a27497792a7f507ed9e83965dc0f",
+  "cargo_lock_sha256": "35e52d106d3f64f0e8fc6cc57b0220fe1f691c0f5475470914346538864c2567",
   "target_resolves": {
     "base": {
       "addr2line-0.25.1": {
@@ -52,7 +52,7 @@
           },
           {
             "name": "zerocopy",
-            "package_key": "zerocopy-0.8.48",
+            "package_key": "zerocopy-0.8.50",
             "kind": "normal",
             "features": [
               "simd"
@@ -493,7 +493,7 @@
           "default"
         ]
       },
-      "bitflags-2.11.1": {
+      "bitflags-2.12.1": {
         "runtime_dependencies": [
           {
             "name": "serde_core",
@@ -601,7 +601,7 @@
           "alloc"
         ]
       },
-      "cc-1.2.62": {
+      "cc-1.2.63": {
         "runtime_dependencies": [
           {
             "name": "find_msvc_tools",
@@ -615,7 +615,7 @@
           },
           {
             "name": "shlex",
-            "package_key": "shlex-1.3.0",
+            "package_key": "shlex-2.0.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -1075,7 +1075,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "compact_str-0.9.0": {
+      "compact_str-0.9.1": {
         "runtime_dependencies": [
           {
             "name": "castaway",
@@ -1156,7 +1156,7 @@
         "runtime_dependencies": [
           {
             "name": "unicode_segmentation",
-            "package_key": "unicode-segmentation-1.13.2",
+            "package_key": "unicode-segmentation-1.13.3",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -1228,7 +1228,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -1290,7 +1290,7 @@
           },
           {
             "name": "mio",
-            "package_key": "mio-1.2.0",
+            "package_key": "mio-1.2.1",
             "kind": "normal",
             "features": [
               "os-poll"
@@ -1372,7 +1372,7 @@
           },
           {
             "name": "typenum",
-            "package_key": "typenum-1.20.0",
+            "package_key": "typenum-1.20.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -2047,7 +2047,7 @@
           },
           {
             "name": "jiff",
-            "package_key": "jiff-0.2.25",
+            "package_key": "jiff-0.2.28",
             "kind": "normal",
             "features": [
               "std"
@@ -2720,7 +2720,7 @@
           "std"
         ]
       },
-      "gen-macros-0.1.8": {
+      "gen-macros-0.1.9": {
         "runtime_dependencies": [
           {
             "name": "proc_macro2",
@@ -2759,11 +2759,11 @@
         "build_dependencies": [],
         "features": []
       },
-      "gen-platform-0.1.8": {
+      "gen-platform-0.1.9": {
         "runtime_dependencies": [
           {
             "name": "gen_macros",
-            "package_key": "gen-macros-0.1.8",
+            "package_key": "gen-macros-0.1.9",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -2773,7 +2773,7 @@
           },
           {
             "name": "gen_types",
-            "package_key": "gen-types-0.1.8",
+            "package_key": "gen-types-0.1.9",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -2827,7 +2827,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "gen-types-0.1.8": {
+      "gen-types-0.1.9": {
         "runtime_dependencies": [
           {
             "name": "blake3",
@@ -2913,7 +2913,7 @@
         "runtime_dependencies": [
           {
             "name": "typenum",
-            "package_key": "typenum-1.20.0",
+            "package_key": "typenum-1.20.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -3492,7 +3492,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "jiff-0.2.25": {
+      "jiff-0.2.28": {
         "runtime_dependencies": [
           {
             "name": "log",
@@ -3624,7 +3624,7 @@
         "build_dependencies": [
           {
             "name": "cc",
-            "package_key": "cc-1.2.62",
+            "package_key": "cc-1.2.63",
             "kind": "build",
             "features": [],
             "uses_default_features": true,
@@ -3642,7 +3642,7 @@
         "build_dependencies": [
           {
             "name": "cc",
-            "package_key": "cc-1.2.62",
+            "package_key": "cc-1.2.63",
             "kind": "build",
             "features": [],
             "uses_default_features": true,
@@ -3685,7 +3685,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -3868,7 +3868,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "mio-1.2.0": {
+      "mio-1.2.1": {
         "runtime_dependencies": [
           {
             "name": "libc",
@@ -3904,7 +3904,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -3957,7 +3957,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -4023,7 +4023,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -4125,7 +4125,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -4924,7 +4924,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -5127,7 +5127,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -5137,7 +5137,7 @@
           },
           {
             "name": "compact_str",
-            "package_key": "compact_str-0.9.0",
+            "package_key": "compact_str-0.9.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": false,
@@ -5221,7 +5221,7 @@
           },
           {
             "name": "unicode_segmentation",
-            "package_key": "unicode-segmentation-1.13.2",
+            "package_key": "unicode-segmentation-1.13.3",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -5367,7 +5367,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -5461,7 +5461,7 @@
           },
           {
             "name": "unicode_segmentation",
-            "package_key": "unicode-segmentation-1.13.2",
+            "package_key": "unicode-segmentation-1.13.3",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -5492,7 +5492,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -5710,7 +5710,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [
               "serde"
@@ -5786,7 +5786,7 @@
         "runtime_dependencies": [
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -6225,7 +6225,7 @@
           "std"
         ]
       },
-      "shikumi-0.1.0": {
+      "shikumi-0.1.2": {
         "runtime_dependencies": [
           {
             "name": "arc_swap",
@@ -6263,7 +6263,7 @@
           },
           {
             "name": "gen_platform",
-            "package_key": "gen-platform-0.1.8",
+            "package_key": "gen-platform-0.1.9",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -6273,7 +6273,7 @@
           },
           {
             "name": "gen_types",
-            "package_key": "gen-types-0.1.8",
+            "package_key": "gen-types-0.1.9",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -6367,6 +6367,14 @@
           "std"
         ]
       },
+      "shlex-2.0.1": {
+        "runtime_dependencies": [],
+        "build_dependencies": [],
+        "features": [
+          "default",
+          "std"
+        ]
+      },
       "signal-hook-0.3.18": {
         "runtime_dependencies": [
           {
@@ -6411,7 +6419,7 @@
           },
           {
             "name": "mio_1_0",
-            "package_key": "mio-1.2.0",
+            "package_key": "mio-1.2.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -6906,7 +6914,7 @@
           "default"
         ]
       },
-      "skim-tab-0.1.1": {
+      "skim-tab-0.1.2": {
         "runtime_dependencies": [
           {
             "name": "anyhow",
@@ -6994,7 +7002,7 @@
           },
           {
             "name": "shikumi",
-            "package_key": "shikumi-0.1.0",
+            "package_key": "shikumi-0.1.2",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7040,7 +7048,7 @@
           "const_generics"
         ]
       },
-      "socket2-0.6.3": {
+      "socket2-0.6.4": {
         "runtime_dependencies": [
           {
             "name": "libc",
@@ -7370,7 +7378,7 @@
           },
           {
             "name": "bitflags",
-            "package_key": "bitflags-2.11.1",
+            "package_key": "bitflags-2.12.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7613,7 +7621,7 @@
           },
           {
             "name": "unicode_segmentation",
-            "package_key": "unicode-segmentation-1.13.2",
+            "package_key": "unicode-segmentation-1.13.3",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7954,7 +7962,7 @@
           },
           {
             "name": "mio",
-            "package_key": "mio-1.2.0",
+            "package_key": "mio-1.2.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": false,
@@ -7964,7 +7972,7 @@
           },
           {
             "name": "mio",
-            "package_key": "mio-1.2.0",
+            "package_key": "mio-1.2.1",
             "kind": "normal",
             "features": [],
             "uses_default_features": false,
@@ -7984,7 +7992,7 @@
           },
           {
             "name": "socket2",
-            "package_key": "socket2-0.6.3",
+            "package_key": "socket2-0.6.4",
             "kind": "normal",
             "features": [
               "all"
@@ -8502,7 +8510,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "typenum-1.20.0": {
+      "typenum-1.20.1": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": []
@@ -8543,7 +8551,7 @@
         "runtime_dependencies": [
           {
             "name": "unicode_segmentation",
-            "package_key": "unicode-segmentation-1.13.2",
+            "package_key": "unicode-segmentation-1.13.3",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -8581,7 +8589,7 @@
           "std"
         ]
       },
-      "unicode-segmentation-1.13.2": {
+      "unicode-segmentation-1.13.3": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": []
@@ -8600,7 +8608,7 @@
           },
           {
             "name": "unicode_segmentation",
-            "package_key": "unicode-segmentation-1.13.2",
+            "package_key": "unicode-segmentation-1.13.3",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -8651,7 +8659,7 @@
           "default"
         ]
       },
-      "uuid-1.23.1": {
+      "uuid-1.23.2": {
         "runtime_dependencies": [
           {
             "name": "atomic",
@@ -8860,7 +8868,7 @@
           },
           {
             "name": "uuid",
-            "package_key": "uuid-1.23.1",
+            "package_key": "uuid-1.23.2",
             "kind": "normal",
             "features": [
               "v1",
@@ -9142,7 +9150,7 @@
           "std"
         ]
       },
-      "zerocopy-0.8.48": {
+      "zerocopy-0.8.50": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": [
@@ -9204,7 +9212,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.62",
+                "package_key": "cc-1.2.63",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -9318,7 +9326,7 @@
               "fallback"
             ]
           },
-          "kqueue-1.1.1": {
+          "kqueue-1.2.0": {
             "runtime_dependencies": [
               {
                 "name": "kqueue_sys",
@@ -9348,7 +9356,7 @@
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -9374,7 +9382,7 @@
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -9384,7 +9392,7 @@
               },
               {
                 "name": "kqueue",
-                "package_key": "kqueue-1.1.1",
+                "package_key": "kqueue-1.2.0",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -9394,7 +9402,7 @@
               },
               {
                 "name": "kqueue",
-                "package_key": "kqueue-1.1.1",
+                "package_key": "kqueue-1.2.0",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -9424,7 +9432,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -9436,7 +9444,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -9448,7 +9456,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -9506,7 +9514,7 @@
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -9636,7 +9644,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.62",
+                "package_key": "cc-1.2.63",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -9724,7 +9732,7 @@
               "fallback"
             ]
           },
-          "kqueue-1.1.1": {
+          "kqueue-1.2.0": {
             "runtime_dependencies": [
               {
                 "name": "kqueue_sys",
@@ -9754,7 +9762,7 @@
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -9780,7 +9788,7 @@
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -9790,7 +9798,7 @@
               },
               {
                 "name": "kqueue",
-                "package_key": "kqueue-1.1.1",
+                "package_key": "kqueue-1.2.0",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -9800,7 +9808,7 @@
               },
               {
                 "name": "kqueue",
-                "package_key": "kqueue-1.1.1",
+                "package_key": "kqueue-1.2.0",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -9830,7 +9838,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -9842,7 +9850,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -9854,7 +9862,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -9912,7 +9920,7 @@
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -10042,7 +10050,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.62",
+                "package_key": "cc-1.2.63",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -10111,11 +10119,11 @@
               "fallback"
             ]
           },
-          "inotify-0.11.1": {
+          "inotify-0.11.2": {
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -10180,7 +10188,7 @@
             "runtime_dependencies": [
               {
                 "name": "inotify",
-                "package_key": "inotify-0.11.1",
+                "package_key": "inotify-0.11.2",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -10210,7 +10218,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -10222,7 +10230,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -10234,7 +10242,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -10281,7 +10289,7 @@
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -10431,7 +10439,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.62",
+                "package_key": "cc-1.2.63",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -10500,11 +10508,11 @@
               "fallback"
             ]
           },
-          "inotify-0.11.1": {
+          "inotify-0.11.2": {
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -10569,7 +10577,7 @@
             "runtime_dependencies": [
               {
                 "name": "inotify",
-                "package_key": "inotify-0.11.1",
+                "package_key": "inotify-0.11.2",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -10599,7 +10607,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -10611,7 +10619,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -10623,7 +10631,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -10670,7 +10678,7 @@
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -10810,7 +10818,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.62",
+                "package_key": "cc-1.2.63",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -10905,11 +10913,11 @@
               "fallback"
             ]
           },
-          "inotify-0.11.1": {
+          "inotify-0.11.2": {
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -10974,7 +10982,7 @@
             "runtime_dependencies": [
               {
                 "name": "inotify",
-                "package_key": "inotify-0.11.1",
+                "package_key": "inotify-0.11.2",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -11004,7 +11012,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -11016,7 +11024,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -11028,7 +11036,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -11075,7 +11083,7 @@
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -11215,7 +11223,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.62",
+                "package_key": "cc-1.2.63",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -11310,11 +11318,11 @@
               "fallback"
             ]
           },
-          "inotify-0.11.1": {
+          "inotify-0.11.2": {
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -11379,7 +11387,7 @@
             "runtime_dependencies": [
               {
                 "name": "inotify",
-                "package_key": "inotify-0.11.1",
+                "package_key": "inotify-0.11.2",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -11409,7 +11417,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -11421,7 +11429,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -11433,7 +11441,7 @@
               },
               {
                 "name": "mio",
-                "package_key": "mio-1.2.0",
+                "package_key": "mio-1.2.1",
                 "kind": "normal",
                 "features": [
                   "os-ext"
@@ -11480,7 +11488,7 @@
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.11.1",
+                "package_key": "bitflags-2.12.1",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -11653,7 +11661,7 @@
     "bitflags-1.3.2": {
       "edition": "2018"
     },
-    "bitflags-2.11.1": {
+    "bitflags-2.12.1": {
       "edition": "2021"
     },
     "blake3-1.8.5": {
@@ -11675,7 +11683,7 @@
     "castaway-0.2.4": {
       "edition": "2018"
     },
-    "cc-1.2.62": {
+    "cc-1.2.63": {
       "edition": "2018"
     },
     "cfg-if-1.0.4": {
@@ -11731,7 +11739,7 @@
     "colorchoice-1.0.5": {
       "edition": "2021"
     },
-    "compact_str-0.9.0": {
+    "compact_str-0.9.1": {
       "edition": "2021"
     },
     "constant_time_eq-0.4.2": {
@@ -11920,14 +11928,14 @@
     "futures-util-0.3.32": {
       "edition": "2018"
     },
-    "gen-macros-0.1.8": {
+    "gen-macros-0.1.9": {
       "edition": "2024",
       "proc_macro": true
     },
-    "gen-platform-0.1.8": {
+    "gen-platform-0.1.9": {
       "edition": "2024"
     },
-    "gen-types-0.1.8": {
+    "gen-types-0.1.9": {
       "edition": "2024"
     },
     "generic-array-0.14.7": {
@@ -12005,7 +12013,7 @@
     "itoa-1.0.18": {
       "edition": "2021"
     },
-    "jiff-0.2.25": {
+    "jiff-0.2.28": {
       "edition": "2021"
     },
     "kanal-0.1.1": {
@@ -12014,7 +12022,7 @@
     "kasuari-0.4.12": {
       "edition": "2021"
     },
-    "kqueue-1.1.1": {
+    "kqueue-1.2.0": {
       "edition": "2021"
     },
     "kqueue-sys-1.1.2": {
@@ -12086,7 +12094,7 @@
     "miniz_oxide-0.8.9": {
       "edition": "2021"
     },
-    "mio-1.2.0": {
+    "mio-1.2.1": {
       "edition": "2021"
     },
     "nix-0.28.0": {
@@ -12363,11 +12371,14 @@
     "shell-words-1.1.1": {
       "edition": "2015"
     },
-    "shikumi-0.1.0": {
+    "shikumi-0.1.2": {
       "edition": "2024"
     },
     "shlex-1.3.0": {
       "edition": "2015"
+    },
+    "shlex-2.0.1": {
+      "edition": "2018"
     },
     "signal-hook-0.3.18": {
       "edition": "2018",
@@ -12394,7 +12405,7 @@
         }
       ]
     },
-    "skim-tab-0.1.1": {
+    "skim-tab-0.1.2": {
       "edition": "2024",
       "lib_target": {
         "name": "skim_tab",
@@ -12445,7 +12456,7 @@
     "smallvec-1.15.1": {
       "edition": "2018"
     },
-    "socket2-0.6.3": {
+    "socket2-0.6.4": {
       "edition": "2021"
     },
     "static_assertions-1.1.0": {
@@ -12557,7 +12568,7 @@
       "edition": "2018",
       "build_script": "build.rs"
     },
-    "typenum-1.20.0": {
+    "typenum-1.20.1": {
       "edition": "2018"
     },
     "ucd-trie-0.1.7": {
@@ -12579,7 +12590,7 @@
     "unicode-normalization-0.1.25": {
       "edition": "2018"
     },
-    "unicode-segmentation-1.13.2": {
+    "unicode-segmentation-1.13.3": {
       "edition": "2018"
     },
     "unicode-truncate-2.0.1": {
@@ -12607,7 +12618,7 @@
     "utf8parse-0.2.2": {
       "edition": "2018"
     },
-    "uuid-1.23.1": {
+    "uuid-1.23.2": {
       "edition": "2021"
     },
     "vcpkg-0.2.15": {
@@ -12656,7 +12667,7 @@
     "yansi-1.0.1": {
       "edition": "2021"
     },
-    "zerocopy-0.8.48": {
+    "zerocopy-0.8.50": {
       "edition": "2021",
       "build_script": "build.rs"
     },
@@ -12667,7 +12678,7 @@
     "cpufeatures-0.3.0": {
       "edition": "2024"
     },
-    "inotify-0.11.1": {
+    "inotify-0.11.2": {
       "edition": "2018"
     },
     "inotify-sys-0.1.5": {
@@ -12678,10 +12689,10 @@
     }
   },
   "git_nar_sha256": {
-    "gen-macros-0.1.8": "sha256-/qPu9zmukIQuTj76JofI0drfJ7h69z9sneMSUVZqIak=",
-    "gen-platform-0.1.8": "sha256-/qPu9zmukIQuTj76JofI0drfJ7h69z9sneMSUVZqIak=",
-    "gen-types-0.1.8": "sha256-/qPu9zmukIQuTj76JofI0drfJ7h69z9sneMSUVZqIak=",
-    "shikumi-0.1.0": "sha256-ilg+vxQV9+lulw8hg3RwfCTWyG16zJ8jAH0wmtGOzgs="
+    "gen-macros-0.1.9": "sha256-KkZmHxQBwz3Q4XNaJVLdl6TLLPiR+erMbGOrrvPRE0A=",
+    "gen-platform-0.1.9": "sha256-KkZmHxQBwz3Q4XNaJVLdl6TLLPiR+erMbGOrrvPRE0A=",
+    "gen-types-0.1.9": "sha256-KkZmHxQBwz3Q4XNaJVLdl6TLLPiR+erMbGOrrvPRE0A=",
+    "shikumi-0.1.2": "sha256-pkEmUjEdtwr6ag8rHhCeRikPDAEwzDbEcxojFhHKsCU="
   },
   "flake_metadata": {}
 }
