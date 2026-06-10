@@ -78,6 +78,13 @@ thiserror = "2.0.18"
 
 [dev-dependencies]
 tempfile = "3"
+# proptest — Pillar-10 property testing for the frecency-parity invariant
+# (tests/frecency_parity.rs): skim-tab's frecency_score path must equal the
+# wadachi-spec interpreter for arbitrary visit histories, forever.
+proptest = "1"
+# chrono — only to construct the NaiveDateTime visit timestamps wadachi-spec's
+# typed border (DirEntry) speaks. Same major as wadachi-spec's own dep.
+chrono = "0.4"
 
 [profile.release]
 opt-level = "z"
