@@ -2488,6 +2488,7 @@ dependencies = [
  "skim",
  "tempfile",
  "thiserror 2.0.18",
+ "wadachi-spec",
 ]
 
 [[package]]
@@ -3028,6 +3029,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d9b2acfb050df409c972a37d3b8e08cdea3bddb0c09db9d53137e504cfabed0"
 dependencies = [
  "utf8parse",
+]
+
+[[package]]
+name = "wadachi-spec"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99951d42cb21b0b26506126a6c53ddde1bc32023e6108958a050d0e2e195afc9"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

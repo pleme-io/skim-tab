@@ -26,14 +26,17 @@ pub enum HistoryError {
 
 /// Compute a single frecency contribution from one historical event.
 ///
-/// The formula is: `1.0 / (1.0 + age_days)` where `age_days` is clamped
-/// to non-negative. Recent events (age near 0) contribute close to 1.0;
-/// older events decay hyperbolically.
+/// The formula is `1.0 / (1.0 + age_days)` (hyperbolic decay): recent events
+/// (age near 0) contribute ~1.0; older events tail off. For an entry with
+/// multiple occurrences, sum the per-occurrence scores.
 ///
-/// For an entry with multiple occurrences, sum the per-occurrence scores.
+/// This **delegates to the shared `wadachi-spec` frecency core** (the fleet's
+/// one ranking formula) so command history and wadachi's directory frecency
+/// can never drift — there is exactly one decay function, owned by
+/// `wadachi_spec::DecayKind::HyperbolicDays`.
 #[must_use]
 pub fn frecency_score(age_days: f64, _frequency: u32) -> f64 {
-    1.0 / (1.0 + age_days.max(0.0))
+    wadachi_spec::DecayKind::HyperbolicDays.decay(age_days, 0.0)
 }
 
 // ── HistoryStore trait ───────────────────────────────────────────────
