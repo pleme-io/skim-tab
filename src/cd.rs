@@ -22,21 +22,39 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
     let query = parse_query(&args);
 
-    let entries = fd_discover(FdTarget::Directories)?;
-    if entries.is_empty() {
+    // Frecency-ranked directories first (fleet-wide, includes indexer-
+    // discovered) from the shared wadachi store — skim-cd is a READER, it never
+    // records (the shell already did at cd time). Graceful if the store is
+    // empty/absent. Then cwd-local `fd` discoveries, de-duplicated.
+    let mut entries_vec: Vec<String> = wadachi::top_n("", 200)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|r| r.path.to_string_lossy().into_owned())
+        .collect();
+    let mut seen: std::collections::HashSet<String> = entries_vec.iter().cloned().collect();
+    for dir in fd_discover(FdTarget::Directories)?.lines() {
+        if seen.insert(dir.to_string()) {
+            entries_vec.push(dir.to_string());
+        }
+    }
+    if entries_vec.is_empty() {
         return Ok(());
     }
+    let entries = entries_vec.join("\n");
 
     let item_reader = SkimItemReader::default();
     let items = item_reader.of_bufread(io::Cursor::new(entries));
 
     let options = build_options(
         base_options(query)
+            // Preserve frecency order until the user types (skim would otherwise
+            // re-sort) — the same recipe as the completion picker.
+            .no_sort(true)
             .scheme(MatchScheme::Path)
             .prompt(ICON_CD.to_string())
             .preview(preview_command())
             .preview_window(PreviewLayout::from("right:50%:wrap"))
-            .header("Directories | CTRL-/: Toggle Preview | ESC: Cancel".to_string()),
+            .header("Directories (frecency) | CTRL-/: Toggle Preview | ESC: Cancel".to_string()),
     )?;
 
     match Skim::run_with(options, Some(items)) {
