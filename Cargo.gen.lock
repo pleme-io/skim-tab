@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "cargo_lock_sha256": "7262c0c6cea0bd9f53832ce8d073516342df7f74ebc1028488a8762cacc7f15a",
+  "cargo_lock_sha256": "b67618d0acf38e8ca8a90215c48bd019377a1b9394465275975d0140e20b2cc3",
   "target_resolves": {
     "base": {
       "addr2line-0.25.1": {
@@ -7276,7 +7276,7 @@
           "default"
         ]
       },
-      "skim-tab-0.1.4": {
+      "skim-tab-0.1.5": {
         "runtime_dependencies": [
           {
             "name": "anyhow",
@@ -12886,7 +12886,7 @@
         }
       ]
     },
-    "skim-tab-0.1.4": {
+    "skim-tab-0.1.5": {
       "edition": "2024",
       "lib_target": {
         "name": "skim_tab",
