@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "cargo_lock_sha256": "bdcf993dea75e9777a6829b0f7cda661e85df60ee2eee44970abfa2beaf1d246",
+  "cargo_lock_sha256": "abfc285bd0ff7e39dda496d9bf11dfef0169c1ca83610e9cc10830a76e31a277",
   "target_resolves": {
     "base": {
       "addr2line-0.25.1": {
@@ -6911,7 +6911,7 @@
           "std"
         ]
       },
-      "shikumi-0.1.11-755e61532e19d783062a99e97206f6023bb3f169": {
+      "shikumi-0.1.17-d96494f2cd93e6261131b1948d19ef5e894e7d79": {
         "runtime_dependencies": [
           {
             "name": "arc_swap",
@@ -7600,7 +7600,7 @@
           "default"
         ]
       },
-      "skim-tab-0.1.5": {
+      "skim-tab-0.1.6": {
         "runtime_dependencies": [
           {
             "name": "anyhow",
@@ -7698,7 +7698,7 @@
           },
           {
             "name": "shikumi",
-            "package_key": "shikumi-0.1.11-755e61532e19d783062a99e97206f6023bb3f169",
+            "package_key": "shikumi-0.1.17-d96494f2cd93e6261131b1948d19ef5e894e7d79",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -13227,7 +13227,7 @@
     "shell-words-1.1.1": {
       "edition": "2015"
     },
-    "shikumi-0.1.11-755e61532e19d783062a99e97206f6023bb3f169": {
+    "shikumi-0.1.17-d96494f2cd93e6261131b1948d19ef5e894e7d79": {
       "edition": "2024"
     },
     "shlex-1.3.0": {
@@ -13261,7 +13261,7 @@
         }
       ]
     },
-    "skim-tab-0.1.5": {
+    "skim-tab-0.1.6": {
       "edition": "2024",
       "lib_target": {
         "name": "skim_tab",
@@ -13568,7 +13568,7 @@
     "gen-macros-0.1.10-712c3466375ddb1d6876193f2afb0798d30efb70": "sha256-7BNW4JfFa8nTvkq9O7Thxt1P6fSgcmPU4sthBdBfMgM=",
     "gen-platform-0.1.10-712c3466375ddb1d6876193f2afb0798d30efb70": "sha256-7BNW4JfFa8nTvkq9O7Thxt1P6fSgcmPU4sthBdBfMgM=",
     "gen-types-0.1.10-712c3466375ddb1d6876193f2afb0798d30efb70": "sha256-7BNW4JfFa8nTvkq9O7Thxt1P6fSgcmPU4sthBdBfMgM=",
-    "shikumi-0.1.11-755e61532e19d783062a99e97206f6023bb3f169": "sha256-HPp5MAUcCptTBYKD6lUgiKaOG4vZB5I2CwsWjipZXoA="
+    "shikumi-0.1.17-d96494f2cd93e6261131b1948d19ef5e894e7d79": "sha256-5QEXLAGVuQ9LC+ybC1rUHRQJjYsc3dQniOXDGQMIQhs="
   },
   "flake_metadata": {}
 }
