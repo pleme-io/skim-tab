@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     // discovered) from the shared wadachi store — skim-cd is a READER, it never
     // records (the shell already did at cd time). Graceful if the store is
     // empty/absent. Then cwd-local `fd` discoveries, de-duplicated.
-    let mut entries_vec: Vec<String> = wadachi::top_n("", 200)
+    let mut entries_vec: Vec<String> = pleme_io_wadachi::top_n("", 200)
         .unwrap_or_default()
         .into_iter()
         .map(|r| r.path.to_string_lossy().into_owned())
