@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "cargo_lock_sha256": "b67618d0acf38e8ca8a90215c48bd019377a1b9394465275975d0140e20b2cc3",
+  "cargo_lock_sha256": "bdcf993dea75e9777a6829b0f7cda661e85df60ee2eee44970abfa2beaf1d246",
   "target_resolves": {
     "base": {
       "addr2line-0.25.1": {
@@ -497,10 +497,37 @@
           "std"
         ]
       },
+      "bit-set-0.8.0": {
+        "runtime_dependencies": [
+          {
+            "name": "bit_vec",
+            "package_key": "bit-vec-0.8.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          }
+        ],
+        "build_dependencies": [],
+        "features": [
+          "default",
+          "std"
+        ]
+      },
       "bit-vec-0.6.3": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": [
+          "std"
+        ]
+      },
+      "bit-vec-0.8.0": {
+        "runtime_dependencies": [],
+        "build_dependencies": [],
+        "features": [
+          "default",
           "std"
         ]
       },
@@ -3107,7 +3134,9 @@
           }
         ],
         "build_dependencies": [],
-        "features": []
+        "features": [
+          "std"
+        ]
       },
       "getrandom-0.4.2": {
         "runtime_dependencies": [
@@ -5156,6 +5185,27 @@
         "build_dependencies": [],
         "features": []
       },
+      "ppv-lite86-0.2.21": {
+        "runtime_dependencies": [
+          {
+            "name": "zerocopy",
+            "package_key": "zerocopy-0.8.52",
+            "kind": "normal",
+            "features": [
+              "simd"
+            ],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          }
+        ],
+        "build_dependencies": [],
+        "features": [
+          "simd",
+          "std"
+        ]
+      },
       "proc-macro2-1.0.106": {
         "runtime_dependencies": [
           {
@@ -5236,6 +5286,133 @@
           "yansi"
         ]
       },
+      "proptest-1.11.0": {
+        "runtime_dependencies": [
+          {
+            "name": "bit_set",
+            "package_key": "bit-set-0.8.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "bit_vec",
+            "package_key": "bit-vec-0.8.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "bitflags",
+            "package_key": "bitflags-2.13.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "num_traits",
+            "package_key": "num-traits-0.2.19",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "rand",
+            "package_key": "rand-0.9.4",
+            "kind": "normal",
+            "features": [
+              "alloc"
+            ],
+            "uses_default_features": false,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "rand_chacha",
+            "package_key": "rand_chacha-0.9.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": false,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "rand_xorshift",
+            "package_key": "rand_xorshift-0.4.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "regex_syntax",
+            "package_key": "regex-syntax-0.8.11",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "rusty_fork",
+            "package_key": "rusty-fork-0.3.1",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "tempfile",
+            "package_key": "tempfile-3.26.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": true,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "unarray",
+            "package_key": "unarray-0.1.4",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          }
+        ],
+        "build_dependencies": [],
+        "features": [
+          "bit-set",
+          "default",
+          "fork",
+          "regex-syntax",
+          "rusty-fork",
+          "std",
+          "tempfile",
+          "timeout"
+        ]
+      },
       "pulldown-cmark-0.13.4": {
         "runtime_dependencies": [
           {
@@ -5269,6 +5446,11 @@
             "tree": "target"
           }
         ],
+        "build_dependencies": [],
+        "features": []
+      },
+      "quick-error-1.2.3": {
+        "runtime_dependencies": [],
         "build_dependencies": [],
         "features": []
       },
@@ -5307,6 +5489,36 @@
         "build_dependencies": [],
         "features": [
           "small_rng"
+        ]
+      },
+      "rand-0.9.4": {
+        "runtime_dependencies": [
+          {
+            "name": "rand_chacha",
+            "package_key": "rand_chacha-0.9.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": false,
+            "optional": true,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "rand_core",
+            "package_key": "rand_core-0.9.5",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": false,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          }
+        ],
+        "build_dependencies": [],
+        "features": [
+          "alloc",
+          "os_rng",
+          "std"
         ]
       },
       "rand-0.10.0": {
@@ -5354,13 +5566,76 @@
           "thread_rng"
         ]
       },
+      "rand_chacha-0.9.0": {
+        "runtime_dependencies": [
+          {
+            "name": "ppv_lite86",
+            "package_key": "ppv-lite86-0.2.21",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "rand_core",
+            "package_key": "rand_core-0.9.5",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          }
+        ],
+        "build_dependencies": [],
+        "features": [
+          "std"
+        ]
+      },
       "rand_core-0.6.4": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": []
       },
+      "rand_core-0.9.5": {
+        "runtime_dependencies": [
+          {
+            "name": "getrandom",
+            "package_key": "getrandom-0.3.4",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": true,
+            "target": null,
+            "tree": "target"
+          }
+        ],
+        "build_dependencies": [],
+        "features": [
+          "os_rng",
+          "std"
+        ]
+      },
       "rand_core-0.10.1": {
         "runtime_dependencies": [],
+        "build_dependencies": [],
+        "features": []
+      },
+      "rand_xorshift-0.4.0": {
+        "runtime_dependencies": [
+          {
+            "name": "rand_core",
+            "package_key": "rand_core-0.9.5",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          }
+        ],
         "build_dependencies": [],
         "features": []
       },
@@ -6238,6 +6513,55 @@
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": []
+      },
+      "rusty-fork-0.3.1": {
+        "runtime_dependencies": [
+          {
+            "name": "fnv",
+            "package_key": "fnv-1.0.7",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "quick_error",
+            "package_key": "quick-error-1.2.3",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "tempfile",
+            "package_key": "tempfile-3.26.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "wait_timeout",
+            "package_key": "wait-timeout-0.2.1",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          }
+        ],
+        "build_dependencies": [],
+        "features": [
+          "timeout",
+          "wait-timeout"
+        ]
       },
       "ryu-1.0.23": {
         "runtime_dependencies": [],
@@ -8905,6 +9229,11 @@
           "std"
         ]
       },
+      "unarray-0.1.4": {
+        "runtime_dependencies": [],
+        "build_dependencies": [],
+        "features": []
+      },
       "uncased-0.9.10": {
         "runtime_dependencies": [],
         "build_dependencies": [
@@ -9209,6 +9538,22 @@
             "uses_default_features": true,
             "optional": false,
             "target": null,
+            "tree": "target"
+          }
+        ],
+        "build_dependencies": [],
+        "features": []
+      },
+      "wait-timeout-0.2.1": {
+        "runtime_dependencies": [
+          {
+            "name": "libc",
+            "package_key": "libc-0.2.186",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": "cfg(unix)",
             "tree": "target"
           }
         ],
@@ -12091,7 +12436,13 @@
     "bit-set-0.5.3": {
       "edition": "2015"
     },
+    "bit-set-0.8.0": {
+      "edition": "2015"
+    },
     "bit-vec-0.6.3": {
+      "edition": "2015"
+    },
+    "bit-vec-0.8.0": {
       "edition": "2015"
     },
     "bitflags-1.3.2": {
@@ -12187,11 +12538,11 @@
     "convert_case-0.10.0": {
       "edition": "2021"
     },
-    "cpufeatures-0.2.17": {
+    "core-foundation-sys-0.8.7": {
       "edition": "2018"
     },
-    "cpufeatures-0.3.0": {
-      "edition": "2024"
+    "cpufeatures-0.2.17": {
+      "edition": "2018"
     },
     "critical-section-1.2.0": {
       "edition": "2018"
@@ -12441,12 +12792,6 @@
     "inlinable_string-0.1.15": {
       "edition": "2018"
     },
-    "inotify-0.11.2": {
-      "edition": "2018"
-    },
-    "inotify-sys-0.1.5": {
-      "edition": "2015"
-    },
     "instability-0.3.12": {
       "edition": "2021",
       "proc_macro": true,
@@ -12482,6 +12827,12 @@
     "kasuari-0.4.12": {
       "edition": "2021"
     },
+    "kqueue-1.2.0": {
+      "edition": "2021"
+    },
+    "kqueue-sys-1.1.2": {
+      "edition": "2021"
+    },
     "lab-0.11.0": {
       "edition": "2015"
     },
@@ -12508,9 +12859,6 @@
     },
     "line-clipping-0.3.7": {
       "edition": "2024"
-    },
-    "linux-raw-sys-0.12.1": {
-      "edition": "2021"
     },
     "litrs-1.0.0": {
       "edition": "2021"
@@ -12698,6 +13046,9 @@
     "powerfmt-0.2.0": {
       "edition": "2021"
     },
+    "ppv-lite86-0.2.21": {
+      "edition": "2021"
+    },
     "proc-macro2-1.0.106": {
       "edition": "2021",
       "build_script": "build.rs"
@@ -12705,6 +13056,9 @@
     "proc-macro2-diagnostics-0.10.1": {
       "edition": "2018",
       "build_script": "build.rs"
+    },
+    "proptest-1.11.0": {
+      "edition": "2021"
     },
     "pulldown-cmark-0.13.4": {
       "edition": "2021",
@@ -12716,6 +13070,9 @@
         }
       ]
     },
+    "quick-error-1.2.3": {
+      "edition": "2015"
+    },
     "quote-1.0.45": {
       "edition": "2021",
       "build_script": "build.rs"
@@ -12723,14 +13080,26 @@
     "rand-0.8.6": {
       "edition": "2018"
     },
+    "rand-0.9.4": {
+      "edition": "2021"
+    },
     "rand-0.10.0": {
       "edition": "2024"
+    },
+    "rand_chacha-0.9.0": {
+      "edition": "2021"
     },
     "rand_core-0.6.4": {
       "edition": "2018"
     },
+    "rand_core-0.9.5": {
+      "edition": "2021"
+    },
     "rand_core-0.10.1": {
       "edition": "2024"
+    },
+    "rand_xorshift-0.4.0": {
+      "edition": "2021"
     },
     "ratatui-0.30.0": {
       "edition": "2024"
@@ -12802,6 +13171,9 @@
       "edition": "2018",
       "proc_macro": true,
       "build_script": "build/build.rs"
+    },
+    "rusty-fork-0.3.1": {
+      "edition": "2018"
     },
     "ryu-1.0.23": {
       "edition": "2021"
@@ -13055,6 +13427,9 @@
     "ucd-trie-0.1.7": {
       "edition": "2021"
     },
+    "unarray-0.1.4": {
+      "edition": "2018"
+    },
     "uncased-0.9.10": {
       "edition": "2018",
       "build_script": "build.rs"
@@ -13120,6 +13495,23 @@
     "wadachi-spec-0.1.4": {
       "edition": "2024"
     },
+    "wait-timeout-0.2.1": {
+      "edition": "2015",
+      "binaries": [
+        {
+          "name": "exit",
+          "path": "src/bin/exit.rs"
+        },
+        {
+          "name": "reader",
+          "path": "src/bin/reader.rs"
+        },
+        {
+          "name": "sleep",
+          "path": "src/bin/sleep.rs"
+        }
+      ]
+    },
     "walkdir-2.5.0": {
       "edition": "2018"
     },
@@ -13159,13 +13551,16 @@
       "edition": "2021",
       "build_script": "build.rs"
     },
-    "core-foundation-sys-0.8.7": {
+    "cpufeatures-0.3.0": {
+      "edition": "2024"
+    },
+    "inotify-0.11.2": {
       "edition": "2018"
     },
-    "kqueue-1.2.0": {
-      "edition": "2021"
+    "inotify-sys-0.1.5": {
+      "edition": "2015"
     },
-    "kqueue-sys-1.1.2": {
+    "linux-raw-sys-0.12.1": {
       "edition": "2021"
     }
   },
