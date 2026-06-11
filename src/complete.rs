@@ -766,10 +766,10 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     let item_reader = SkimItemReader::new(SkimItemReaderOption::default().ansi(true));
     let items = item_reader.of_bufread(io::Cursor::new(items_text));
 
-    let output = match Skim::run_with(skim_opts, Some(items)) {
-        Ok(o) => o,
-        Err(e) => {
-            eprintln!("skim-tab: skim error: {e}");
+    let output = match crate::run_skim_on_tty(skim_opts, Some(items)) {
+        Some(o) => o,
+        None => {
+            eprintln!("skim-tab: skim failed to run");
             let _ = std::fs::remove_file(&manifest_path);
             std::process::exit(2);
         }

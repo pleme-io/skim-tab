@@ -183,6 +183,67 @@ pub fn build_options(builder: &mut SkimOptionsBuilder) -> Result<SkimOptions> {
     builder.build().context("failed to build skim options")
 }
 
+// ── TTY-guarded skim invocation ─────────────────────────────────────
+
+/// RAII guard holding the process's stdout on the controlling tty.
+///
+/// skim 3.x's stack (ratatui `CrosstermBackend::get_cursor_position` →
+/// `crossterm::cursor::position`) writes terminal queries — `ESC[6n`
+/// among them — to the *process stdout*, never to `/dev/tty`. Every
+/// skim-tab binary runs with stdout piped (the pipe IS the selection
+/// protocol), so without this guard those query bytes land in the pipe
+/// ahead of the selection, and the answer never arrives because the
+/// terminal never saw the query — stalling teardown on a multi-second
+/// timeout. With fd 1 on the tty for the duration of the run, queries
+/// reach a terminal that can answer them; the selection prints after
+/// the guard drops, on the restored stdout.
+struct TtyStdoutGuard {
+    saved_stdout: std::os::fd::OwnedFd,
+}
+
+impl TtyStdoutGuard {
+    /// `None` when there is no controlling tty (headless CI) or the fd
+    /// shuffle fails — callers run unguarded; with no terminal attached
+    /// there is nothing to answer queries anyway.
+    fn redirect() -> Option<Self> {
+        use std::os::fd::{AsFd, AsRawFd};
+        let tty = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/tty")
+            .ok()?;
+        let saved_stdout = std::io::stdout().as_fd().try_clone_to_owned().ok()?;
+        // Flush libstd's buffer so bytes written so far stay on the pipe.
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+        nix::unistd::dup2(tty.as_raw_fd(), 1).ok()?;
+        Some(Self { saved_stdout })
+    }
+}
+
+impl Drop for TtyStdoutGuard {
+    fn drop(&mut self) {
+        use std::os::fd::AsRawFd;
+        // Flush anything skim's stack buffered toward the tty, then put
+        // the real stdout back so the selection lands on the pipe.
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+        let _ = nix::unistd::dup2(self.saved_stdout.as_raw_fd(), 1);
+    }
+}
+
+/// Run skim with stdout routed to the controlling tty for the duration —
+/// the only sanctioned way for a skim-tab binary to invoke skim. Print
+/// selections AFTER this returns so they land on the real stdout.
+///
+/// Folds skim's internal error into `None` (callers treat both "error"
+/// and "abort" as no-selection).
+pub fn run_skim_on_tty(
+    options: SkimOptions,
+    source: Option<skim::SkimItemReceiver>,
+) -> Option<skim::SkimOutput> {
+    let _guard = TtyStdoutGuard::redirect();
+    skim::Skim::run_with(options, source).ok()
+}
+
 // ── Path helpers ────────────────────────────────────────────────────
 
 /// Expand `~` at the start of a path to `$HOME`. Other `~user` forms

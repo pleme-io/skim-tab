@@ -9,8 +9,7 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
-use skim::Skim;
-use skim_tab::{base_options, build_options};
+use skim_tab::{base_options, build_options, run_skim_on_tty};
 
 /// Icon for git operations.
 const ICON_GIT: &str = "\u{25ce} "; // ◎ (bullseye — branch target)
@@ -52,8 +51,8 @@ fn main() -> Result<()> {
             .header("Branches | CTRL-/: Toggle Preview | ESC: Cancel".to_string()),
     )?;
 
-    match Skim::run_with(options, Some(items)) {
-        Ok(out) if !out.is_abort => {
+    match run_skim_on_tty(options, Some(items)) {
+        Some(out) if !out.is_abort => {
             if let Some(item) = out.selected_items.first() {
                 let branch = item.output().to_string();
                 // Strip origin/ prefix for remote branches

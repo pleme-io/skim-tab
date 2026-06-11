@@ -124,7 +124,7 @@ pub fn run_descent_picker(
     let reader = SkimItemReader::new(SkimItemReaderOption::default().ansi(true));
     let items = reader.of_bufread(io::Cursor::new(items_text));
 
-    let output = Skim::run_with(skim_opts, Some(items)).ok()?;
+    let output = crate::run_skim_on_tty(skim_opts, Some(items))?;
     if output.is_abort {
         return None;
     }

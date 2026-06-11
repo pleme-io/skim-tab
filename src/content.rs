@@ -11,8 +11,7 @@ use std::process::{Command, Stdio};
 use anyhow::{Context, Result};
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
-use skim::Skim;
-use skim_tab::{base_options, build_options, editor, parse_query, shell_quote, ICON_SEARCH};
+use skim_tab::{base_options, build_options, editor, parse_query, run_skim_on_tty, shell_quote, ICON_SEARCH};
 
 /// Run ripgrep and return stdout. Color is OFF so delimiter parsing is clean.
 /// Skim still highlights fuzzy matches via its own hl/hl+ colors.
@@ -78,8 +77,8 @@ fn main() -> Result<()> {
             .header("Search in files | CTRL-/: Toggle Preview | ESC: Cancel".to_string()),
     )?;
 
-    match Skim::run_with(options, Some(items)) {
-        Ok(out) if !out.is_abort => {
+    match run_skim_on_tty(options, Some(items)) {
+        Some(out) if !out.is_abort => {
             if let Some(item) = out.selected_items.first() {
                 let raw = item.output();
                 if let Some((file, line)) = parse_rg_match(&raw) {

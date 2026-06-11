@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "cargo_lock_sha256": "abfc285bd0ff7e39dda496d9bf11dfef0169c1ca83610e9cc10830a76e31a277",
+  "cargo_lock_sha256": "fa911919b90da4d94e239a79bc1e7fc8b207e3800a6dc51cbcb2e270bd16ec30",
   "target_resolves": {
     "base": {
       "addr2line-0.25.1": {
@@ -4168,7 +4168,10 @@
           "memoffset",
           "mman",
           "net",
-          "socket"
+          "process",
+          "signal",
+          "socket",
+          "term"
         ]
       },
       "nix-0.31.2": {
@@ -7627,6 +7630,21 @@
             "package_key": "lscolors-0.20.0",
             "kind": "normal",
             "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "nix",
+            "package_key": "nix-0.29.0",
+            "kind": "normal",
+            "features": [
+              "fs",
+              "term",
+              "process",
+              "signal"
+            ],
             "uses_default_features": true,
             "optional": false,
             "target": null,
@@ -12538,11 +12556,11 @@
     "convert_case-0.10.0": {
       "edition": "2021"
     },
-    "cpufeatures-0.2.17": {
+    "core-foundation-sys-0.8.7": {
       "edition": "2018"
     },
-    "cpufeatures-0.3.0": {
-      "edition": "2024"
+    "cpufeatures-0.2.17": {
+      "edition": "2018"
     },
     "critical-section-1.2.0": {
       "edition": "2018"
@@ -12792,12 +12810,6 @@
     "inlinable_string-0.1.15": {
       "edition": "2018"
     },
-    "inotify-0.11.2": {
-      "edition": "2018"
-    },
-    "inotify-sys-0.1.5": {
-      "edition": "2015"
-    },
     "instability-0.3.12": {
       "edition": "2021",
       "proc_macro": true,
@@ -12833,6 +12845,12 @@
     "kasuari-0.4.12": {
       "edition": "2021"
     },
+    "kqueue-1.2.0": {
+      "edition": "2021"
+    },
+    "kqueue-sys-1.1.2": {
+      "edition": "2021"
+    },
     "lab-0.11.0": {
       "edition": "2015"
     },
@@ -12859,9 +12877,6 @@
     },
     "line-clipping-0.3.7": {
       "edition": "2024"
-    },
-    "linux-raw-sys-0.12.1": {
-      "edition": "2021"
     },
     "litrs-1.0.0": {
       "edition": "2021"
@@ -13554,13 +13569,16 @@
       "edition": "2021",
       "build_script": "build.rs"
     },
-    "core-foundation-sys-0.8.7": {
+    "cpufeatures-0.3.0": {
+      "edition": "2024"
+    },
+    "inotify-0.11.2": {
       "edition": "2018"
     },
-    "kqueue-1.2.0": {
-      "edition": "2021"
+    "inotify-sys-0.1.5": {
+      "edition": "2015"
     },
-    "kqueue-sys-1.1.2": {
+    "linux-raw-sys-0.12.1": {
       "edition": "2021"
     }
   },

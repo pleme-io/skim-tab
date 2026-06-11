@@ -12,8 +12,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
-use skim::Skim;
-use skim_tab::{base_options, build_options, parse_query, ICON_HISTORY};
+use skim_tab::{base_options, build_options, parse_query, run_skim_on_tty, ICON_HISTORY};
 
 /// Parse a zsh extended history line.
 /// Format: `: TIMESTAMP:0;COMMAND` or just `COMMAND` (plain format).
@@ -115,8 +114,8 @@ fn main() -> Result<()> {
             .header("History | ESC: Cancel".to_string()),
     )?;
 
-    match Skim::run_with(options, Some(items)) {
-        Ok(out) if !out.is_abort => {
+    match run_skim_on_tty(options, Some(items)) {
+        Some(out) if !out.is_abort => {
             if let Some(item) = out.selected_items.first() {
                 print!("{}", item.output());
             }

@@ -75,9 +75,17 @@ pleme-io-wadachi = "0.1.4"
 rusqlite = { version = "0.32", features = ["bundled"] }
 crossterm = "0.29"
 thiserror = "2.0.18"
+# nix — fd plumbing for TtyStdoutGuard (stdout→tty swap around every skim
+# run; see lib.rs). Same version skim itself pulls, so nothing new enters
+# the tree. "term"/"process" feed the pty regression test in
+# tests/picker_stdout_purity.rs.
+nix = { version = "0.29", features = ["fs", "term", "process", "signal"] }
 
 [dev-dependencies]
 tempfile = "3"
+# libc — async-signal-safe _exit in the pty regression test's fork child
+# (tests/picker_stdout_purity.rs), mirroring frost's L0 harness.
+libc = "0.2"
 # proptest — Pillar-10 property testing for the frecency-parity invariant
 # (tests/frecency_parity.rs): skim-tab's frecency_score path must equal the
 # wadachi-spec interpreter for arbitrary visit histories, forever.

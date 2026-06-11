@@ -9,8 +9,7 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
-use skim::Skim;
-use skim_tab::{base_options, build_options};
+use skim_tab::{base_options, build_options, run_skim_on_tty};
 
 /// Icon for Kubernetes operations.
 const ICON_K8S: &str = "\u{2388} "; // ⎈ (helm symbol)
@@ -50,8 +49,8 @@ fn main() -> Result<()> {
             .header("Pods | CTRL-/: Toggle Preview | ESC: Cancel".to_string()),
     )?;
 
-    match Skim::run_with(options, Some(items)) {
-        Ok(out) if !out.is_abort => {
+    match run_skim_on_tty(options, Some(items)) {
+        Some(out) if !out.is_abort => {
             if let Some(item) = out.selected_items.first() {
                 let line = item.output().to_string();
                 if let Some(pod) = line.split_whitespace().next() {

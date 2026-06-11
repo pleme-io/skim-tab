@@ -9,8 +9,7 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
-use skim::Skim;
-use skim_tab::{base_options, build_options, ICON_MARKER, ICON_SEARCH};
+use skim_tab::{base_options, build_options, run_skim_on_tty, ICON_MARKER, ICON_SEARCH};
 
 /// List processes via ps.
 fn process_list() -> Result<String> {
@@ -52,8 +51,8 @@ fn main() -> Result<()> {
             )),
     )?;
 
-    match Skim::run_with(options, Some(items)) {
-        Ok(out) if !out.is_abort => {
+    match run_skim_on_tty(options, Some(items)) {
+        Some(out) if !out.is_abort => {
             for item in &out.selected_items {
                 let line = item.output().to_string();
                 if let Some(pid) = line.split_whitespace().next() {

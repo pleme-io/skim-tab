@@ -11,8 +11,7 @@ use anyhow::Result;
 use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
-use skim::Skim;
-use skim_tab::{base_options, build_options, fd_discover, parse_query, shell_quote, FdTarget, ICON_FILES, ICON_MARKER};
+use skim_tab::{base_options, build_options, fd_discover, parse_query, run_skim_on_tty, shell_quote, FdTarget, ICON_FILES, ICON_MARKER};
 
 /// Preview command: directories get eza tree, files get bat.
 fn preview_command() -> String {
@@ -47,8 +46,8 @@ fn main() -> Result<()> {
             .header("TAB: Multi-select | CTRL-/: Toggle Preview | ESC: Cancel".to_string()),
     )?;
 
-    match Skim::run_with(options, Some(items)) {
-        Ok(out) if !out.is_abort => {
+    match run_skim_on_tty(options, Some(items)) {
+        Some(out) if !out.is_abort => {
             let paths: Vec<String> = out
                 .selected_items
                 .iter()
