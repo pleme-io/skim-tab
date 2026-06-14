@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "cargo_lock_sha256": "37ffb60c34fe9bd0a651cf653993a5c3702f138fcd30b78009476e3c6ea14f85",
+  "cargo_lock_sha256": "4f39e10f342089f40af7b0dc9eca772ce1f3ea8dc8633325f57946fd4eb3ff7f",
   "target_resolves": {
     "base": {
       "addr2line-0.25.1": {
@@ -138,7 +138,7 @@
           },
           {
             "name": "smallvec",
-            "package_key": "smallvec-1.15.1",
+            "package_key": "smallvec-1.15.2",
             "kind": "normal",
             "features": [
               "const_generics"
@@ -651,7 +651,7 @@
           "alloc"
         ]
       },
-      "cc-1.2.63": {
+      "cc-1.2.64": {
         "runtime_dependencies": [
           {
             "name": "find_msvc_tools",
@@ -1744,22 +1744,10 @@
         "features": []
       },
       "deranged-0.5.8": {
-        "runtime_dependencies": [
-          {
-            "name": "powerfmt",
-            "package_key": "powerfmt-0.2.0",
-            "kind": "normal",
-            "features": [],
-            "uses_default_features": false,
-            "optional": true,
-            "target": null,
-            "tree": "target"
-          }
-        ],
+        "runtime_dependencies": [],
         "build_dependencies": [],
         "features": [
-          "default",
-          "powerfmt"
+          "default"
         ]
       },
       "derive_builder-0.20.2": {
@@ -3776,7 +3764,7 @@
         "build_dependencies": [
           {
             "name": "cc",
-            "package_key": "cc-1.2.63",
+            "package_key": "cc-1.2.64",
             "kind": "build",
             "features": [],
             "uses_default_features": true,
@@ -3794,7 +3782,7 @@
         "build_dependencies": [
           {
             "name": "cc",
-            "package_key": "cc-1.2.63",
+            "package_key": "cc-1.2.64",
             "kind": "build",
             "features": [],
             "uses_default_features": true,
@@ -4579,7 +4567,7 @@
           },
           {
             "name": "smallvec",
-            "package_key": "smallvec-1.15.1",
+            "package_key": "smallvec-1.15.2",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -4999,7 +4987,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "pleme-io-wadachi-0.1.4": {
+      "pleme-io-wadachi-0.1.5": {
         "runtime_dependencies": [
           {
             "name": "anyhow",
@@ -5047,6 +5035,26 @@
             "tree": "target"
           },
           {
+            "name": "notify",
+            "package_key": "notify-8.2.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": false,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
+            "name": "notify",
+            "package_key": "notify-8.2.0",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": false,
+            "optional": false,
+            "target": "cfg(target_os = \"macos\")",
+            "tree": "target"
+          },
+          {
             "name": "rusqlite",
             "package_key": "rusqlite-0.32.1",
             "kind": "normal",
@@ -5072,7 +5080,7 @@
           },
           {
             "name": "wadachi_spec",
-            "package_key": "wadachi-spec-0.1.4",
+            "package_key": "wadachi-spec-0.1.5",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -6091,7 +6099,7 @@
           },
           {
             "name": "time",
-            "package_key": "time-0.3.47",
+            "package_key": "time-0.3.49",
             "kind": "normal",
             "features": [],
             "uses_default_features": false,
@@ -6476,7 +6484,7 @@
           },
           {
             "name": "smallvec",
-            "package_key": "smallvec-1.15.1",
+            "package_key": "smallvec-1.15.2",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -6914,7 +6922,7 @@
           "std"
         ]
       },
-      "shikumi-0.1.17-d96494f2cd93e6261131b1948d19ef5e894e7d79": {
+      "shikumi-0.1.37-355994d430203c51a5ddb663a2cdbc3be8613452": {
         "runtime_dependencies": [
           {
             "name": "arc_swap",
@@ -7603,7 +7611,7 @@
           "default"
         ]
       },
-      "skim-tab-0.1.7": {
+      "skim-tab-0.1.8": {
         "runtime_dependencies": [
           {
             "name": "anyhow",
@@ -7652,7 +7660,7 @@
           },
           {
             "name": "pleme_io_wadachi",
-            "package_key": "pleme-io-wadachi-0.1.4",
+            "package_key": "pleme-io-wadachi-0.1.5",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7716,7 +7724,7 @@
           },
           {
             "name": "shikumi",
-            "package_key": "shikumi-0.1.17-d96494f2cd93e6261131b1948d19ef5e894e7d79",
+            "package_key": "shikumi-0.1.37-355994d430203c51a5ddb663a2cdbc3be8613452",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7746,7 +7754,7 @@
           },
           {
             "name": "wadachi_spec",
-            "package_key": "wadachi-spec-0.1.4",
+            "package_key": "wadachi-spec-0.1.5",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7765,7 +7773,7 @@
           "std"
         ]
       },
-      "smallvec-1.15.1": {
+      "smallvec-1.15.2": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": [
@@ -8540,15 +8548,13 @@
         "build_dependencies": [],
         "features": []
       },
-      "time-0.3.47": {
+      "time-0.3.49": {
         "runtime_dependencies": [
           {
             "name": "deranged",
             "package_key": "deranged-0.5.8",
             "kind": "normal",
-            "features": [
-              "powerfmt"
-            ],
+            "features": [],
             "uses_default_features": true,
             "optional": false,
             "target": null,
@@ -8606,7 +8612,7 @@
           },
           {
             "name": "time_core",
-            "package_key": "time-core-0.1.8",
+            "package_key": "time-core-0.1.9",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -8622,7 +8628,7 @@
           "std"
         ]
       },
-      "time-core-0.1.8": {
+      "time-core-0.1.9": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": []
@@ -9511,7 +9517,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "wadachi-spec-0.1.4": {
+      "wadachi-spec-0.1.5": {
         "runtime_dependencies": [
           {
             "name": "chrono",
@@ -10008,7 +10014,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.63",
+                "package_key": "cc-1.2.64",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -10104,6 +10110,22 @@
             "build_dependencies": [],
             "features": []
           },
+          "fsevent-sys-4.1.0": {
+            "runtime_dependencies": [
+              {
+                "name": "libc",
+                "package_key": "libc-0.2.186",
+                "kind": "normal",
+                "features": [],
+                "uses_default_features": true,
+                "optional": false,
+                "target": null,
+                "tree": "target"
+              }
+            ],
+            "build_dependencies": [],
+            "features": []
+          },
           "iana-time-zone-0.1.65": {
             "runtime_dependencies": [
               {
@@ -10179,6 +10201,16 @@
               {
                 "name": "bitflags",
                 "package_key": "bitflags-2.13.0",
+                "kind": "normal",
+                "features": [],
+                "uses_default_features": true,
+                "optional": false,
+                "target": "cfg(target_os = \"macos\")",
+                "tree": "target"
+              },
+              {
+                "name": "fsevent_sys",
+                "package_key": "fsevent-sys-4.1.0",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -10285,7 +10317,9 @@
             ],
             "build_dependencies": [],
             "features": [
+              "fsevent-sys",
               "kqueue",
+              "macos_fsevent",
               "macos_kqueue",
               "mio"
             ]
@@ -10440,7 +10474,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.63",
+                "package_key": "cc-1.2.64",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -10507,6 +10541,22 @@
           },
           "cpufeatures-0.3.0": {
             "runtime_dependencies": [],
+            "build_dependencies": [],
+            "features": []
+          },
+          "fsevent-sys-4.1.0": {
+            "runtime_dependencies": [
+              {
+                "name": "libc",
+                "package_key": "libc-0.2.186",
+                "kind": "normal",
+                "features": [],
+                "uses_default_features": true,
+                "optional": false,
+                "target": null,
+                "tree": "target"
+              }
+            ],
             "build_dependencies": [],
             "features": []
           },
@@ -10585,6 +10635,16 @@
               {
                 "name": "bitflags",
                 "package_key": "bitflags-2.13.0",
+                "kind": "normal",
+                "features": [],
+                "uses_default_features": true,
+                "optional": false,
+                "target": "cfg(target_os = \"macos\")",
+                "tree": "target"
+              },
+              {
+                "name": "fsevent_sys",
+                "package_key": "fsevent-sys-4.1.0",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": true,
@@ -10691,7 +10751,9 @@
             ],
             "build_dependencies": [],
             "features": [
+              "fsevent-sys",
               "kqueue",
+              "macos_fsevent",
               "macos_kqueue",
               "mio"
             ]
@@ -10846,7 +10908,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.63",
+                "package_key": "cc-1.2.64",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -11071,7 +11133,9 @@
             ],
             "build_dependencies": [],
             "features": [
+              "fsevent-sys",
               "kqueue",
+              "macos_fsevent",
               "macos_kqueue",
               "mio"
             ]
@@ -11235,7 +11299,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.63",
+                "package_key": "cc-1.2.64",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -11460,7 +11524,9 @@
             ],
             "build_dependencies": [],
             "features": [
+              "fsevent-sys",
               "kqueue",
+              "macos_fsevent",
               "macos_kqueue",
               "mio"
             ]
@@ -11614,7 +11680,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.63",
+                "package_key": "cc-1.2.64",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -11865,7 +11931,9 @@
             ],
             "build_dependencies": [],
             "features": [
+              "fsevent-sys",
               "kqueue",
+              "macos_fsevent",
               "macos_kqueue",
               "mio"
             ]
@@ -12019,7 +12087,7 @@
             "build_dependencies": [
               {
                 "name": "cc",
-                "package_key": "cc-1.2.63",
+                "package_key": "cc-1.2.64",
                 "kind": "build",
                 "features": [],
                 "uses_default_features": true,
@@ -12270,7 +12338,9 @@
             ],
             "build_dependencies": [],
             "features": [
+              "fsevent-sys",
               "kqueue",
+              "macos_fsevent",
               "macos_kqueue",
               "mio"
             ]
@@ -12491,7 +12561,7 @@
     "castaway-0.2.4": {
       "edition": "2018"
     },
-    "cc-1.2.63": {
+    "cc-1.2.64": {
       "edition": "2018"
     },
     "cfg-if-1.0.4": {
@@ -13048,7 +13118,7 @@
     "pkg-config-0.3.33": {
       "edition": "2018"
     },
-    "pleme-io-wadachi-0.1.4": {
+    "pleme-io-wadachi-0.1.5": {
       "edition": "2024",
       "binaries": [
         {
@@ -13245,7 +13315,7 @@
     "shell-words-1.1.1": {
       "edition": "2015"
     },
-    "shikumi-0.1.17-d96494f2cd93e6261131b1948d19ef5e894e7d79": {
+    "shikumi-0.1.37-355994d430203c51a5ddb663a2cdbc3be8613452": {
       "edition": "2024"
     },
     "shlex-1.3.0": {
@@ -13279,7 +13349,7 @@
         }
       ]
     },
-    "skim-tab-0.1.7": {
+    "skim-tab-0.1.8": {
       "edition": "2024",
       "lib_target": {
         "name": "skim_tab",
@@ -13327,7 +13397,7 @@
     "slab-0.4.12": {
       "edition": "2018"
     },
-    "smallvec-1.15.1": {
+    "smallvec-1.15.2": {
       "edition": "2018"
     },
     "socket2-0.6.4": {
@@ -13385,10 +13455,10 @@
     "thread_local-1.1.9": {
       "edition": "2021"
     },
-    "time-0.3.47": {
+    "time-0.3.49": {
       "edition": "2024"
     },
-    "time-core-0.1.8": {
+    "time-core-0.1.9": {
       "edition": "2024"
     },
     "tinyvec-1.11.0": {
@@ -13513,7 +13583,7 @@
     "vtparse-0.6.2": {
       "edition": "2018"
     },
-    "wadachi-spec-0.1.4": {
+    "wadachi-spec-0.1.5": {
       "edition": "2024"
     },
     "wait-timeout-0.2.1": {
@@ -13575,6 +13645,9 @@
     "core-foundation-sys-0.8.7": {
       "edition": "2018"
     },
+    "fsevent-sys-4.1.0": {
+      "edition": "2018"
+    },
     "kqueue-1.2.0": {
       "edition": "2021"
     },
@@ -13586,7 +13659,7 @@
     "gen-macros-0.1.10-712c3466375ddb1d6876193f2afb0798d30efb70": "sha256-7BNW4JfFa8nTvkq9O7Thxt1P6fSgcmPU4sthBdBfMgM=",
     "gen-platform-0.1.10-712c3466375ddb1d6876193f2afb0798d30efb70": "sha256-7BNW4JfFa8nTvkq9O7Thxt1P6fSgcmPU4sthBdBfMgM=",
     "gen-types-0.1.10-712c3466375ddb1d6876193f2afb0798d30efb70": "sha256-7BNW4JfFa8nTvkq9O7Thxt1P6fSgcmPU4sthBdBfMgM=",
-    "shikumi-0.1.17-d96494f2cd93e6261131b1948d19ef5e894e7d79": "sha256-5QEXLAGVuQ9LC+ybC1rUHRQJjYsc3dQniOXDGQMIQhs="
+    "shikumi-0.1.37-355994d430203c51a5ddb663a2cdbc3be8613452": "sha256-SkHaUzWDdrOZmSrnDDxPNSb6AMQO3dIKZg9iZ0x4hhU="
   },
   "flake_metadata": {}
 }
