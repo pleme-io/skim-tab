@@ -21,26 +21,28 @@ use anyhow::{Context, Result};
 use skim::prelude::{SkimOptions, SkimOptionsBuilder};
 use skim::tui::options::TuiLayout;
 
-/// Nord color palette for skim, used by all binaries.
+/// Vellum (warm aged-paper Nord-matte) color palette for skim, used by all
+/// binaries. This is the fleet picker theme.
 ///
 /// Mirror: this string is byte-equivalent (modulo whitespace) to the output
-/// of `lib/skim-theme.nix` in the pleme-io/nix consumer repo. If you change
-/// one, change the other so every picker on the system looks the same.
+/// of `lib/skim-theme.nix` in the pleme-io/nix consumer repo, which is now
+/// Vellum. If you change one, change the other so every picker on the system
+/// looks the same.
 pub const NORD_COLORS: &str = "\
-fg:#D8DEE9,\
-bg:#2E3440,\
-hl:#88C0D0:bold:underlined,\
-fg+:#ECEFF4:bold,\
-bg+:#3B4252,\
-hl+:#8FBCBB:bold:underlined,\
-info:#4C566A,\
-prompt:#A3BE8C,\
-pointer:#88C0D0,\
-marker:#B48EAD,\
-spinner:#81A1C1,\
-header:#5E81AC,\
-border:#4C566A,\
-query:#ECEFF4:bold";
+fg:#E2DBC8,\
+bg:#16140E,\
+hl:#94BBB8:bold:underlined,\
+fg+:#F4EFE2:bold,\
+bg+:#2B2820,\
+hl+:#A6CBC8:bold:underlined,\
+info:#6E6857,\
+prompt:#A9BB8C,\
+pointer:#ADD7A3,\
+marker:#B8A1B9,\
+spinner:#99AABE,\
+header:#99AABE,\
+border:#6E6857,\
+query:#F4EFE2:bold";
 
 /// Standard keybindings applied to all skim-tab pickers.
 pub const STANDARD_BINDS: &[&str] = &[
