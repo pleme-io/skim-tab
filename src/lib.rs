@@ -21,14 +21,33 @@ use anyhow::{Context, Result};
 use skim::prelude::{SkimOptions, SkimOptionsBuilder};
 use skim::tui::options::TuiLayout;
 
-/// Vellum (warm aged-paper Nord-matte) color palette for skim, used by all
-/// binaries. This is the fleet picker theme.
+/// Classic Nord color palette for skim — the active fleet picker theme.
+/// Matches the deployed ghostty palette (polar-night ground, frost/aurora
+/// accents) so every picker looks like the rest of the Nord stack.
 ///
-/// Mirror: this string is byte-equivalent (modulo whitespace) to the output
-/// of `lib/skim-theme.nix` in the pleme-io/nix consumer repo, which is now
-/// Vellum. If you change one, change the other so every picker on the system
-/// looks the same.
+/// Mirror: byte-equivalent (modulo whitespace) to `lib/skim-theme.nix`'s
+/// `nord` branch in the pleme-io/nix consumer repo. Flip both together.
+/// `VELLUM_COLORS` below preserves the warm aged-paper theme (restorable).
 pub const NORD_COLORS: &str = "\
+fg:#D8DEE9,\
+bg:#2E3440,\
+hl:#88C0D0:bold:underlined,\
+fg+:#ECEFF4:bold,\
+bg+:#3B4252,\
+hl+:#8FBCBB:bold:underlined,\
+info:#4C566A,\
+prompt:#A3BE8C,\
+pointer:#88C0D0,\
+marker:#B48EAD,\
+spinner:#81A1C1,\
+header:#81A1C1,\
+border:#4C566A,\
+query:#ECEFF4:bold";
+
+/// Vellum (warm aged-paper Nord-matte) — SAVED, restorable. Swap the
+/// `base_options` reference from `NORD_COLORS` to this (and flip
+/// `lib/skim-theme.nix`) to bring the parchment picker theme back.
+pub const VELLUM_COLORS: &str = "\
 fg:#E2DBC8,\
 bg:#16140E,\
 hl:#94BBB8:bold:underlined,\
