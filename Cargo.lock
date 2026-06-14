@@ -2605,8 +2605,8 @@ checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
 
 [[package]]
 name = "shikumi"
-version = "0.1.37"
-source = "git+https://github.com/pleme-io/shikumi#355994d430203c51a5ddb663a2cdbc3be8613452"
+version = "0.1.52"
+source = "git+https://github.com/pleme-io/shikumi#21952c2ecfa4cfc9fc5b07be6141b63cea62071f"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -2725,7 +2725,7 @@ dependencies = [
 
 [[package]]
 name = "skim-tab"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "anyhow",
  "chrono",
