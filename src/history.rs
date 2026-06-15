@@ -34,14 +34,21 @@ fn history_path() -> PathBuf {
     PathBuf::from(home).join(".zsh_history")
 }
 
-/// Read history, deduplicate (most recent wins), return in reverse order.
+/// Read history from the resolved `$HISTFILE`, deduplicate (most recent
+/// wins), return most-recent-first.
+fn read_history() -> Result<Vec<String>> {
+    read_history_from(&history_path())
+}
+
+/// Read a history file at `path`, deduplicate (most recent wins), return
+/// **most-recent-first** so the skim picker (`no_sort(true)`,
+/// `TuiLayout::Reverse`) lands the cursor on the most-recently-run command.
 ///
 /// Uses byte-level reading with lossy UTF-8 conversion so corrupted
 /// history entries are cleaned up rather than crashing the search.
-fn read_history() -> Result<Vec<String>> {
-    let path = history_path();
+fn read_history_from(path: &std::path::Path) -> Result<Vec<String>> {
     let file =
-        fs::File::open(&path).with_context(|| format!("failed to open {}", path.display()))?;
+        fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
     let mut reader = io::BufReader::new(file);
 
     let mut seen: HashMap<String, usize> = HashMap::new();
@@ -214,5 +221,79 @@ mod tests {
         unsafe { env::remove_var("HISTFILE") };
         let path = history_path();
         assert!(path.to_str().unwrap().ends_with(".zsh_history"));
+    }
+
+    // ── read_history_from ordering (the Ctrl-R "most recent on top" bug) ──
+
+    fn write_hist(lines: &[&str]) -> tempfile::NamedTempFile {
+        use std::io::Write;
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        for l in lines {
+            writeln!(f, "{l}").unwrap();
+        }
+        f.flush().unwrap();
+        f
+    }
+
+    /// The core contract: the LAST line in the file (the most-recently-run
+    /// command, as frost/reedline write it: plain newline-separated, append
+    /// order = run order) is index 0 of `read_history_from` — i.e. the TOP,
+    /// pre-selected item in the Ctrl-R picker. Regression for the operator
+    /// report "Ctrl-R doesn't prioritize my most-recent command".
+    #[test]
+    fn most_recent_command_is_first() {
+        let f = write_hist(&["echo one", "echo two", "echo three"]);
+        let got = read_history_from(f.path()).unwrap();
+        assert_eq!(
+            got,
+            vec![
+                "echo three".to_string(),
+                "echo two".to_string(),
+                "echo one".to_string(),
+            ],
+            "most-recently-run command (last line) must be first in the picker feed"
+        );
+        // The single most important guarantee, stated bluntly:
+        assert_eq!(got.first().map(String::as_str), Some("echo three"));
+    }
+
+    /// frost's real on-disk format is plain (one command per line, no zsh
+    /// `: ts:0;` prefix). Confirm the parser leaves plain lines intact and
+    /// still orders most-recent-first.
+    #[test]
+    fn frost_plain_format_orders_most_recent_first() {
+        let f = write_hist(&["git status", "cargo build", "ls -la"]);
+        let got = read_history_from(f.path()).unwrap();
+        assert_eq!(got.first().map(String::as_str), Some("ls -la"));
+        assert_eq!(got.last().map(String::as_str), Some("git status"));
+    }
+
+    /// Re-running an OLD command moves it to the top: dedup keeps the
+    /// most-recent occurrence's position. After `ls; cd; ls`, a Ctrl-R
+    /// shows the just-run `ls` first (not stale at the bottom).
+    #[test]
+    fn rerun_moves_command_to_top() {
+        let f = write_hist(&["ls", "cd /tmp", "ls"]);
+        let got = read_history_from(f.path()).unwrap();
+        assert_eq!(got.first().map(String::as_str), Some("ls"));
+        // Deduped: `ls` appears once.
+        assert_eq!(got.iter().filter(|c| *c == "ls").count(), 1);
+        assert_eq!(got, vec!["ls".to_string(), "cd /tmp".to_string()]);
+    }
+
+    /// Mixed plain + zsh-extended lines still order most-recent-first and
+    /// dedup across formats so a command written once plain and once
+    /// extended doesn't split the most-recent wins logic.
+    #[test]
+    fn extended_and_plain_dedup_consistently() {
+        let f = write_hist(&[
+            "echo hi",
+            ": 1709876543:0;echo hi",
+            "echo bye",
+        ]);
+        let got = read_history_from(f.path()).unwrap();
+        assert_eq!(got.first().map(String::as_str), Some("echo bye"));
+        // `echo hi` deduped to one entry despite two on-disk encodings.
+        assert_eq!(got.iter().filter(|c| *c == "echo hi").count(), 1);
     }
 }
