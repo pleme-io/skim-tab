@@ -24,6 +24,17 @@
 //! On unknown `kind`, an `{"error":"..."}` envelope is returned and the
 //! connection is closed. The client (`complete.rs` or any external tool)
 //! is expected to fall back to fresh-exec semantics.
+//!
+//! ## Lazy spawn-on-first-use
+//!
+//! The daemon's LaunchAgent (`io.pleme.skim-tab-daemon`) stays registered
+//! with launchd but no longer starts eagerly at login (`RunAtLoad=false`,
+//! flipped nix-side). [`ensure_socket`] is the client-side half of that
+//! conversion: on a cold miss it asks launchd to kickstart the
+//! already-registered job (`launchctl kickstart -k`) rather than forking
+//! the daemon binary directly, then polls briefly for the socket to
+//! appear. See [`ensure_socket`]'s doc comment for why a raw fork is the
+//! wrong shape here.
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
@@ -373,6 +384,120 @@ pub fn socket_if_alive() -> Option<PathBuf> {
     if path.exists() { Some(path) } else { None }
 }
 
+// ── Lazy spawn-on-first-use ─────────────────────────────────────────
+
+/// launchd label for the daemon's LaunchAgent. The matching plist is
+/// rendered nix-side (pleme-io/nix, out of scope for this repo) — this
+/// string is the wire contract between the two, so keep it in sync if the
+/// label ever changes.
+const LAUNCHD_LABEL: &str = "io.pleme.skim-tab-daemon";
+
+/// Backoff schedule (milliseconds) for polling the socket after a
+/// `launchctl kickstart`.
+///
+/// Measured live against the real registered LaunchAgent (2026-07-17):
+/// `Server::new`'s own `serde_yaml` parse of the built-in/user/project
+/// specs is fast in isolation, but the end-to-end `launchctl kickstart -k`
+/// round trip — launchd tearing down the old process, re-execing the
+/// `/bin/sh -c 'wait4path /nix/store && exec ...'` wrapper, then the new
+/// process actually binding the socket — took ~0.6-1.4s on a clean
+/// (non-throttled) run, not the low-single-digit milliseconds the
+/// in-process parse time alone would suggest.
+///
+/// Given that, this schedule is a deliberate interactive-latency budget,
+/// not a reliability guarantee: it's short enough that a TAB press never
+/// meaningfully hangs, but it will usually NOT catch a genuine cold start.
+/// That's fine — `spawn_kickstart` already returned before this loop
+/// starts, so the daemon keeps coming up in the background regardless of
+/// whether we see it in time; this completion falls back to
+/// `static_registry` (fully correct, just uncached) and the *next*
+/// completion — moments later — finds an already-warm daemon. Widening
+/// this to reliably catch every cold start would mean blocking every
+/// post-login/post-crash completion for over a second, which is worse UX
+/// than one uncached completion.
+const KICKSTART_POLL_BACKOFF_MS: &[u64] = &[20, 40, 80, 150];
+
+/// Build the `launchctl kickstart -k gui/<uid>/<label>` argv — everything
+/// after the `launchctl` binary name itself. Pure and unit-tested in
+/// isolation from the actual subprocess spawn in [`spawn_kickstart`].
+fn kickstart_argv(uid: u32) -> Vec<String> {
+    vec![
+        "kickstart".to_string(),
+        "-k".to_string(),
+        format!("gui/{uid}/{LAUNCHD_LABEL}"),
+    ]
+}
+
+/// Ask launchd to (re)start the daemon's already-registered LaunchAgent.
+/// Returns `false` on any failure to spawn `launchctl` or a non-zero exit
+/// (agent not registered, no launchd on this platform, ...).
+///
+/// Deliberately NOT unit-tested itself: a real invocation runs against the
+/// real fleet label, and in a dev environment where the agent genuinely
+/// is registered, a test calling this would kickstart (restart) the
+/// operator's live daemon as a side effect of `cargo test`. [`kickstart_argv`]
+/// and [`poll_for_socket`] carry the tested logic around this call, matching
+/// this repo's convention of not unit-testing the subprocess boundary itself
+/// (see e.g. the `preview.rs` / `fco.rs` `Command::new` call sites).
+fn spawn_kickstart(uid: u32) -> bool {
+    std::process::Command::new("launchctl")
+        .args(kickstart_argv(uid))
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+/// Poll [`socket_if_alive`] against a backoff schedule, sleeping between
+/// attempts. The only side effects are the fast filesystem-only liveness
+/// check and `thread::sleep` — no subprocess spawn — so this is safe to
+/// unit-test directly with a short synthetic schedule.
+fn poll_for_socket(backoff_ms: &[u64]) -> Option<PathBuf> {
+    for delay in backoff_ms {
+        std::thread::sleep(std::time::Duration::from_millis(*delay));
+        if let Some(sock) = socket_if_alive() {
+            return Some(sock);
+        }
+    }
+    None
+}
+
+/// Resolve the daemon socket, lazily kickstarting the LaunchAgent on a
+/// cold miss and polling briefly for it to come up.
+///
+/// This is the client-side half of the RunAtLoad→lazy-spawn conversion:
+/// the LaunchAgent stays registered with launchd but no longer starts
+/// eagerly at login, so the first completion after login (or after any
+/// crash) finds no socket. Rather than forking the daemon binary
+/// directly — which would run outside launchd's supervision and race its
+/// own `KeepAlive={SuccessfulExit:false, Crashed:true}` (either a
+/// duplicate process fighting over the socket bind, or launchd
+/// immediately relaunching right after our ad-hoc process exits) — we ask
+/// launchd itself to (re)start the job it already has registered via
+/// `launchctl kickstart -k`. That keeps KeepAlive, logging, and
+/// supervision intact.
+///
+/// Degrades cleanly on any failure — no `launchctl` binary (non-macOS or
+/// a sandboxed test environment), the agent genuinely isn't registered,
+/// or (the common case on a genuine cold start — see
+/// [`KICKSTART_POLL_BACKOFF_MS`]) the daemon simply doesn't finish coming
+/// up within the short poll window — by returning `None`, so the caller
+/// falls back to the static in-process registry exactly as if no daemon
+/// existed at all. Bounded to the `launchctl kickstart` invocation itself
+/// (typically well under 100ms to *issue*, independent of how long the
+/// daemon then takes to actually bind) plus the sum of
+/// [`KICKSTART_POLL_BACKOFF_MS`] (~290ms) — never a multi-second block on
+/// a completion request.
+pub fn ensure_socket() -> Option<PathBuf> {
+    if let Some(sock) = socket_if_alive() {
+        return Some(sock);
+    }
+    if !spawn_kickstart(nix::unistd::Uid::current().as_raw()) {
+        return None;
+    }
+    poll_for_socket(KICKSTART_POLL_BACKOFF_MS)
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -607,6 +732,113 @@ mod tests {
             match original {
                 Some(v) => std::env::set_var("XDG_RUNTIME_DIR", v),
                 None => std::env::remove_var("XDG_RUNTIME_DIR"),
+            }
+        }
+    }
+
+    // ── Lazy spawn-on-first-use ─────────────────────────────────────
+
+    #[test]
+    fn kickstart_argv_builds_expected_launchctl_invocation() {
+        assert_eq!(
+            kickstart_argv(501),
+            vec![
+                "kickstart".to_string(),
+                "-k".to_string(),
+                "gui/501/io.pleme.skim-tab-daemon".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn kickstart_argv_formats_arbitrary_uid() {
+        // uid 0 (root) and a large uid both format cleanly — no
+        // hidden assumption about digit count.
+        assert_eq!(kickstart_argv(0)[2], "gui/0/io.pleme.skim-tab-daemon");
+        assert_eq!(
+            kickstart_argv(4_294_967_295)[2],
+            "gui/4294967295/io.pleme.skim-tab-daemon"
+        );
+    }
+
+    #[test]
+    fn kickstart_poll_backoff_is_bounded_and_short() {
+        // A few attempts, short sleeps — the whole schedule must stay well
+        // under half a second so a completion request never meaningfully
+        // stalls when the daemon never comes up. (Widened from an initial
+        // <100ms budget after live measurement against the real
+        // LaunchAgent showed launchd's kickstart→bind round trip commonly
+        // running several hundred ms to over a second — see
+        // `KICKSTART_POLL_BACKOFF_MS`'s doc comment. This is a UX-latency
+        // cap, not a claim that it reliably catches every cold start.)
+        assert!(
+            KICKSTART_POLL_BACKOFF_MS.len() <= 6,
+            "too many retry attempts: {}",
+            KICKSTART_POLL_BACKOFF_MS.len()
+        );
+        let total: u64 = KICKSTART_POLL_BACKOFF_MS.iter().sum();
+        assert!(
+            total < 500,
+            "backoff schedule totals {total}ms, expected < 500ms"
+        );
+    }
+
+    #[test]
+    fn poll_for_socket_returns_none_when_socket_never_appears() {
+        let dir = tempfile::tempdir().unwrap();
+        let bogus = dir.path().join("never-appears.socket");
+        let original = std::env::var("SKIM_TAB_DAEMON_SOCKET").ok();
+        unsafe { std::env::set_var("SKIM_TAB_DAEMON_SOCKET", &bogus); }
+        // Tiny synthetic schedule — this test only exercises the
+        // give-up-cleanly path, not real timing.
+        assert!(poll_for_socket(&[1, 1]).is_none());
+        unsafe {
+            match original {
+                Some(v) => std::env::set_var("SKIM_TAB_DAEMON_SOCKET", v),
+                None => std::env::remove_var("SKIM_TAB_DAEMON_SOCKET"),
+            }
+        }
+    }
+
+    #[test]
+    fn poll_for_socket_finds_socket_already_present() {
+        let (_dir, socket) = start_test_daemon();
+        let original = std::env::var("SKIM_TAB_DAEMON_SOCKET").ok();
+        unsafe { std::env::set_var("SKIM_TAB_DAEMON_SOCKET", &socket); }
+        assert_eq!(poll_for_socket(&[1, 1, 1]), Some(socket));
+        unsafe {
+            match original {
+                Some(v) => std::env::set_var("SKIM_TAB_DAEMON_SOCKET", v),
+                None => std::env::remove_var("SKIM_TAB_DAEMON_SOCKET"),
+            }
+        }
+    }
+
+    #[test]
+    fn ensure_socket_returns_immediately_when_socket_already_alive() {
+        // Fast path: the socket already exists, so ensure_socket must
+        // short-circuit before ever spawning `launchctl kickstart` or
+        // sleeping through the backoff schedule.
+        let (_dir, socket) = start_test_daemon();
+        let original = std::env::var("SKIM_TAB_DAEMON_SOCKET").ok();
+        unsafe { std::env::set_var("SKIM_TAB_DAEMON_SOCKET", &socket); }
+        let start = std::time::Instant::now();
+        let result = ensure_socket();
+        let elapsed = start.elapsed();
+        assert_eq!(result, Some(socket));
+        // Generous headroom for a loaded CI/dev box (this is a scheduling
+        // fuzz margin, not a claim about real latency) — well below the
+        // sum of KICKSTART_POLL_BACKOFF_MS (~290ms), let alone a real
+        // `spawn_kickstart` subprocess round trip, so this still catches
+        // a fast-path regression that fell through to the slow path.
+        assert!(
+            elapsed < std::time::Duration::from_millis(200),
+            "fast path took {elapsed:?}, expected a plain fs check with no kickstart/backoff"
+        );
+        unsafe {
+            match original {
+                Some(v) => std::env::set_var("SKIM_TAB_DAEMON_SOCKET", v),
+                None => std::env::remove_var("SKIM_TAB_DAEMON_SOCKET"),
             }
         }
     }

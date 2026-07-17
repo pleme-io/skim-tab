@@ -551,12 +551,15 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     };
     let base_cmd = completion_base_cmd(&req.command, &req.buffer);
 
-    // ── Daemon-backed registry (when SKIM_TAB_DAEMON_SOCKET is alive) ──
+    // ── Daemon-backed registry (lazily spawned on first use) ────────
     // One round-trip prefetches icon + is_k8s + every candidate's lookup
     // for `base_cmd`. All subsequent lookups during enrichment are local.
-    // Falls back to `static_registry` on any error.
+    // `ensure_socket` kickstarts the daemon's LaunchAgent on a cold miss
+    // (it no longer starts eagerly at login) and briefly polls for the
+    // socket; falls back to `static_registry` on any error or timeout,
+    // exactly as if no daemon existed at all.
     let cached_provider: Option<crate::daemon::CachedProvider> =
-        crate::daemon::socket_if_alive().and_then(|sock| {
+        crate::daemon::ensure_socket().and_then(|sock| {
             let words: Vec<&str> = req.candidates.iter().map(|c| c.word.as_str()).collect();
             crate::daemon::prefetch(&sock, &base_cmd, &words).ok()
         });

@@ -78,8 +78,10 @@ thiserror = "2.0.18"
 # nix — fd plumbing for TtyStdoutGuard (stdout→tty swap around every skim
 # run; see lib.rs). Same version skim itself pulls, so nothing new enters
 # the tree. "term"/"process" feed the pty regression test in
-# tests/picker_stdout_purity.rs.
-nix = { version = "0.29", features = ["fs", "term", "process", "signal"] }
+# tests/picker_stdout_purity.rs. "user" — getuid() for the
+# `launchctl kickstart -k gui/<uid>/...` lazy daemon spawn (daemon.rs
+# ensure_socket).
+nix = { version = "0.29", features = ["fs", "term", "process", "signal", "user"] }
 
 [dev-dependencies]
 tempfile = "3"
