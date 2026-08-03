@@ -14,6 +14,7 @@ pub mod history_db;
 pub mod k8s;
 pub mod preview;
 pub mod specs;
+pub mod tags;
 
 use std::process::Command;
 

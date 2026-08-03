@@ -54,6 +54,11 @@ use shikumi::{ConfigDiscovery, Format, ProviderChain};
 pub struct Config {
     /// Completion subsystem configuration.
     pub completion: CompletionConfig,
+
+    /// Tag-priority ranking, shared by the Ctrl-R history picker and the
+    /// Tab completion picker. Empty `rules` (the default) is identity —
+    /// see [`crate::tags`] for the semantics.
+    pub tags: crate::tags::TagsConfig,
 }
 
 // ── Completion config ───────────────────────────────────────────────

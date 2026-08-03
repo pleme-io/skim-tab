@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
+use skim_tab::tags::TagSet;
 use skim_tab::{base_options, build_options, parse_query, run_skim_on_tty, ICON_HISTORY};
 
 /// Parse a zsh extended history line.
@@ -101,13 +102,44 @@ fn read_history_from(path: &std::path::Path) -> Result<Vec<String>> {
 }
 
 fn main() -> Result<()> {
-    let entries = read_history()?;
+    let mut entries = read_history()?;
     if entries.is_empty() {
         return Ok(());
     }
 
     let args: Vec<String> = env::args().skip(1).collect();
+
+    // `skim-history --explain <line>` — why did that rank where it did?
+    // A re-ranker you cannot interrogate is a re-ranker you stop trusting,
+    // and the picker itself is the worst place to debug one.
+    if let Some(pos) = args.iter().position(|a| a == "--explain") {
+        let cfg = skim_tab::config::load();
+        let set = TagSet::new(&cfg.tags);
+        for warning in TagSet::lint(&cfg.tags) {
+            eprintln!("warning: tags: {warning}");
+        }
+        let subject = args[pos + 1..].join(" ");
+        let verdict = set.explain(&subject);
+        println!(
+            "{}\t{}\tweight={}",
+            subject,
+            verdict.tag.as_deref().unwrap_or("<untagged>"),
+            verdict.weight
+        );
+        return Ok(());
+    }
+
     let query = parse_query(&args);
+
+    // ── Tag priority ────────────────────────────────────────────────
+    // Applied to the FEED, because the picker runs `no_sort(true)` —
+    // skim will not re-rank, so this order is literally what the operator
+    // sees. Stable, so the most-recent-first ordering above survives
+    // intact inside each tag tier.
+    let tags = TagSet::new(&skim_tab::config::load().tags);
+    if tags.applies_to_history() {
+        tags.rank(&mut entries, String::as_str);
+    }
 
     let input = entries.join("\n");
     let item_reader = SkimItemReader::default();
@@ -209,18 +241,29 @@ mod tests {
 
     // ── history_path ─────────────────────────────────────────────────
 
+    /// Both `history_path` branches in ONE test, deliberately.
+    ///
+    /// They used to be two, and `$HISTFILE` is process-global while cargo
+    /// runs tests on parallel threads — so one test's `set_var` raced the
+    /// other's `remove_var` and whichever lost reported a real-looking
+    /// failure with a real-looking diff. It failed roughly every other
+    /// run on this machine, in both directions.
+    ///
+    /// A mutex would serialise the pair; folding them into one test means
+    /// there is no second writer to race with at all. Order matters: set
+    /// first, then clear, so the env is left the way the rest of the
+    /// suite expects to find it.
     #[test]
-    fn history_path_uses_histfile_env() {
+    fn history_path_prefers_histfile_then_falls_back_to_zsh_history() {
         unsafe { env::set_var("HISTFILE", "/tmp/test_history") };
         assert_eq!(history_path(), PathBuf::from("/tmp/test_history"));
-        unsafe { env::remove_var("HISTFILE") };
-    }
 
-    #[test]
-    fn history_path_defaults_to_zsh_history() {
         unsafe { env::remove_var("HISTFILE") };
         let path = history_path();
-        assert!(path.to_str().unwrap().ends_with(".zsh_history"));
+        assert!(
+            path.to_str().unwrap().ends_with(".zsh_history"),
+            "with no HISTFILE the path falls back under $HOME: {path:?}"
+        );
     }
 
     // ── read_history_from ordering (the Ctrl-R "most recent on top" bug) ──
@@ -279,6 +322,54 @@ mod tests {
         // Deduped: `ls` appears once.
         assert_eq!(got.iter().filter(|c| *c == "ls").count(), 1);
         assert_eq!(got, vec!["ls".to_string(), "cd /tmp".to_string()]);
+    }
+
+    /// The actual Ctrl-R contract, end to end: read the file, then rank.
+    /// Neither half is interesting alone — the composition is, because
+    /// `no_sort(true)` means whatever comes out of here IS what the
+    /// operator sees, and the tag pass must promote git without
+    /// scrambling the recency ordering `most_recent_command_is_first`
+    /// exists to protect.
+    #[test]
+    fn tagged_feed_promotes_git_and_keeps_recency_inside_each_tier() {
+        use skim_tab::tags::{TagRule, TagSet, TagsConfig};
+
+        let f = write_hist(&[
+            "git clone x", // oldest
+            "ls -la",
+            "cargo build",
+            "git status",
+            "echo hi", // newest
+        ]);
+        let mut got = read_history_from(f.path()).unwrap();
+        // Precondition: plain recency, newest first.
+        assert_eq!(got.first().map(String::as_str), Some("echo hi"));
+
+        let set = TagSet::new(&TagsConfig {
+            enable: true,
+            rules: vec![TagRule {
+                tag: "git".into(),
+                weight: 100,
+                command: vec!["git".into()],
+                ..TagRule::default()
+            }],
+            ..TagsConfig::default()
+        });
+        set.rank(&mut got, String::as_str);
+
+        assert_eq!(
+            got,
+            vec![
+                // git tier — still newest-first among themselves
+                "git status".to_string(),
+                "git clone x".to_string(),
+                // untagged tier — untouched relative order
+                "echo hi".to_string(),
+                "cargo build".to_string(),
+                "ls -la".to_string(),
+            ],
+            "tags choose the tier; recency still chooses the order within one"
+        );
     }
 
     /// Mixed plain + zsh-extended lines still order most-recent-first and

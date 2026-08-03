@@ -654,6 +654,26 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         }
     }
 
+    // ── Tag priority ────────────────────────────────────────────────
+    // AFTER frecency, deliberately: the ranker is stable, so frecency
+    // keeps deciding order INSIDE each tag tier while tags decide the
+    // tiers. Running it before would let frecency scatter the tiers again.
+    //
+    // Matched against the candidate word joined to the command being
+    // completed, so a rule written as `command: [git]` fires on git's
+    // completions the same way it fires on a `git …` history line — one
+    // rule, both pickers, rather than a second vocabulary to learn.
+    let tags = crate::tags::TagSet::new(&cfg.tags);
+    if tags.applies_to_completions() {
+        let mut keyed: Vec<(String, _)> = req
+            .candidates
+            .drain(..)
+            .map(|c| (format!("{base_cmd} {}", c.word), c))
+            .collect();
+        tags.rank(&mut keyed, |(line, _)| line.as_str());
+        req.candidates = keyed.into_iter().map(|(_, c)| c).collect();
+    }
+
     let display_lines: Vec<String> = req
         .candidates
         .iter()

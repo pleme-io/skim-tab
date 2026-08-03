@@ -119,6 +119,53 @@ Auto-generated specs can be produced by **completion-forge** from OpenAPI specs.
 - **Native fallback for path descent**: When LBUFFER ends with /, bypass skim and let zsh's `_path_files` handle IPREFIX splitting. This is the only way to get correct multi-level cd descent without reimplementing zsh's path completer.
 - **compadd -Q**: Required for the fzf-tab protocol but prevents zsh from managing directory suffixes. We compensate by appending / in Rust and signaling no-space to zsh.
 
+### Tag priority (`src/tags.rs`) — one ranker, both pickers
+
+Ctrl-R (`skim-history`) and Tab (`complete.rs`) end identically: build a
+`Vec`, hand it to skim with `no_sort(true)`, and **feed order becomes
+display order**. That shared shape is why tag priority is ONE primitive
+both call rather than two rankers that drift apart.
+
+```yaml
+# ~/.config/skim-tab/skim-tab.yaml
+tags:
+  enable: true          # default; with no rules it is already identity
+  apply_to:
+    history: true       # Ctrl-R
+    completions: true   # Tab
+  rules:                # ORDER IS THE PRIORITY LIST — first match wins
+    - tag: danger       # listed first, so it beats `git` on `git push --force`
+      weight: -1000     # negative sinks BELOW untagged
+      contains: ["rm -rf", "--force"]
+    - tag: git
+      weight: 100
+      command: [git, gst, gco, gp, gd]
+    - tag: nix
+      weight: 90
+      command: [nix, nixos-rebuild, darwin-rebuild]
+      prefix: ["nix-"]
+```
+
+Three load-bearing properties:
+
+- **Stable within a tier.** Tags choose the tier; whatever ranked the list
+  before still chooses the order inside one — recency for history (the
+  ordering `most_recent_command_is_first` exists to protect), frecency for
+  completions. The tag pass runs AFTER frecency for exactly this reason.
+- **First-match-wins, not sum-of-weights.** Summing lets two unrelated
+  rules compose into a ranking nobody declared and kills the short answer
+  to "why is this here". Declaration order is the priority list: move a
+  rule up, it wins.
+- **No regex.** `command` (first word, exact) / `prefix` / `contains`. The
+  matcher runs over every history entry on every Ctrl-R, and a mistyped
+  regex that silently matches everything is invisible inside a picker.
+  Empty pattern strings are ignored for the same reason — a bare `""`
+  prefix would tag the entire feed.
+
+Inspect it instead of guessing: `skim-history --explain "git push --force"`
+prints the matched tag and weight, and reports inert rules (no patterns —
+they can never fire) on stderr.
+
 ## Consumers
 
 - **blackmatter-shell** — skim-tab-complete plugin (init.zsh widget + keybindings)
