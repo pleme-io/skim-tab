@@ -15,6 +15,7 @@ pub mod k8s;
 pub mod preview;
 pub mod specs;
 pub mod tags;
+pub mod usage_rank;
 
 use std::process::Command;
 

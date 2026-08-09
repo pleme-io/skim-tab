@@ -3,27 +3,39 @@
 //! Reads ~/.zsh_history (extended format), deduplicates keeping most recent,
 //! presents via skim, and prints the selected command to stdout.
 
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{self, BufRead};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim_tab::tags::TagSet;
+use skim_tab::usage_rank::{self, UsageEntry};
 use skim_tab::{base_options, build_options, parse_query, run_skim_on_tty, ICON_HISTORY};
 
-/// Parse a zsh extended history line.
-/// Format: `: TIMESTAMP:0;COMMAND` or just `COMMAND` (plain format).
+/// Parse a zsh extended history line, keeping only the command.
+///
+/// Delegates to [`usage_rank::parse_history_entry`], which additionally
+/// recovers the timestamp this function threw away — that discarded timestamp
+/// is precisely why Ctrl-R could not rank by usage.
+///
+/// Test-only: it survives at its original signature purely so the parser tests
+/// below keep asserting the command-extraction contract against unedited
+/// expectations. The picker itself no longer discards the timestamp.
+#[cfg(test)]
 fn parse_history_line(line: &str) -> &str {
-    if line.starts_with(": ")
-        && let Some(pos) = line.find(';')
-    {
-        return &line[pos + 1..];
-    }
-    line
+    usage_rank::parse_history_entry(line).1
+}
+
+/// Current wall-clock as unix-epoch seconds.
+fn now_unix() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 /// Resolve the history file path.
@@ -35,25 +47,23 @@ fn history_path() -> PathBuf {
     PathBuf::from(home).join(".zsh_history")
 }
 
-/// Read history from the resolved `$HISTFILE`, deduplicate (most recent
-/// wins), return most-recent-first.
-fn read_history() -> Result<Vec<String>> {
-    read_history_from(&history_path())
+/// Read the resolved `$HISTFILE` as accumulated per-command usage.
+fn read_usage() -> Result<Vec<UsageEntry>> {
+    read_usage_from(&history_path())
 }
 
-/// Read a history file at `path`, deduplicate (most recent wins), return
-/// **most-recent-first** so the skim picker (`no_sort(true)`,
-/// `TuiLayout::Reverse`) lands the cursor on the most-recently-run command.
+/// Read a history file into **logical** lines, joining `\`-continuations and
+/// leaving the `: <epoch>:<duration>;` prefix intact so the timestamp survives
+/// as far as the accumulator.
 ///
-/// Uses byte-level reading with lossy UTF-8 conversion so corrupted
-/// history entries are cleaned up rather than crashing the search.
-fn read_history_from(path: &std::path::Path) -> Result<Vec<String>> {
+/// Uses byte-level reading with lossy UTF-8 conversion so corrupted history
+/// entries are cleaned up rather than crashing the search.
+fn read_lines_from(path: &std::path::Path) -> Result<Vec<String>> {
     let file =
         fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
     let mut reader = io::BufReader::new(file);
 
-    let mut seen: HashMap<String, usize> = HashMap::new();
-    let mut counter: usize = 0;
+    let mut lines: Vec<String> = Vec::new();
     let mut continuation = String::new();
     let mut buf = Vec::new();
 
@@ -74,12 +84,7 @@ fn read_history_from(path: &std::path::Path) -> Result<Vec<String>> {
             continuation.push('\n');
             continuation.push_str(&line);
             if !line.ends_with('\\') {
-                let cmd = parse_history_line(&continuation).to_owned();
-                if !cmd.is_empty() {
-                    seen.insert(cmd, counter);
-                    counter += 1;
-                }
-                continuation.clear();
+                lines.push(std::mem::take(&mut continuation));
             }
             continue;
         }
@@ -87,33 +92,54 @@ fn read_history_from(path: &std::path::Path) -> Result<Vec<String>> {
             continuation = line.into_owned();
             continue;
         }
-
-        let cmd = parse_history_line(&line);
-        if !cmd.is_empty() {
-            seen.insert(cmd.to_owned(), counter);
-            counter += 1;
-        }
+        lines.push(line.into_owned());
     }
 
-    let mut entries: Vec<(String, usize)> = seen.into_iter().collect();
-    entries.sort_unstable_by_key(|e| std::cmp::Reverse(e.1));
+    // An unterminated continuation at EOF is discarded, matching the behavior
+    // this refactor replaced. Recovering it is a real (if rare) fix — a
+    // dangling `\` loses the operator's last command — but it is deliberately
+    // NOT folded in here, so `read_history_from`'s tests stay a clean parity
+    // oracle for this change rather than an edited one.
 
-    Ok(entries.into_iter().map(|(cmd, _)| cmd).collect())
+    Ok(lines)
+}
+
+/// Accumulate a history file into one [`UsageEntry`] per distinct command,
+/// preserving occurrence counts and per-occurrence timestamps.
+fn read_usage_from(path: &std::path::Path) -> Result<Vec<UsageEntry>> {
+    let lines = read_lines_from(path)?;
+    Ok(usage_rank::accumulate(lines.iter().map(String::as_str)))
+}
+
+/// Deduplicated commands, **most-recent-first** — the pre-frecency feed.
+///
+/// A converting shim over [`read_usage_from`], kept at its original signature
+/// so the ordering tests below still pin the recency contract they were written
+/// for. They are this refactor's parity oracle: they assert what the old
+/// hand-rolled dedup produced, and they are not edited by it.
+///
+/// Test-only — the picker reads [`read_usage`] and ranks it. `RankMode::Recency`
+/// is the live equivalent for an operator who wants this order back.
+#[cfg(test)]
+fn read_history_from(path: &std::path::Path) -> Result<Vec<String>> {
+    Ok(usage_rank::rank(
+        read_usage_from(path)?,
+        usage_rank::RankOptions {
+            mode: usage_rank::RankMode::Recency,
+            pin_most_recent: false,
+        },
+        0,
+    ))
 }
 
 fn main() -> Result<()> {
-    let mut entries = read_history()?;
-    if entries.is_empty() {
-        return Ok(());
-    }
-
     let args: Vec<String> = env::args().skip(1).collect();
+    let cfg = skim_tab::config::load();
 
     // `skim-history --explain <line>` — why did that rank where it did?
     // A re-ranker you cannot interrogate is a re-ranker you stop trusting,
     // and the picker itself is the worst place to debug one.
     if let Some(pos) = args.iter().position(|a| a == "--explain") {
-        let cfg = skim_tab::config::load();
         let set = TagSet::new(&cfg.tags);
         for warning in TagSet::lint(&cfg.tags) {
             eprintln!("warning: tags: {warning}");
@@ -129,14 +155,75 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    // `skim-history --rank-report [N]` — the feed the picker WOULD show, with
+    // the score and occurrence count that put each line there, alongside the
+    // pre-frecency order for comparison. Same reasoning as `--explain`: a
+    // re-ranker you cannot interrogate is a re-ranker you stop trusting, and
+    // this is the surface that answers "is it actually ranking my real
+    // history, or only my fixtures?".
+    if let Some(pos) = args.iter().position(|a| a == "--rank-report") {
+        let top: usize = args
+            .get(pos + 1)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(15);
+        let usage = read_usage()?;
+        let now = now_unix();
+        let opts = cfg.history.rank_options();
+
+        let old = usage_rank::rank(
+            usage.clone(),
+            usage_rank::RankOptions {
+                mode: usage_rank::RankMode::Recency,
+                pin_most_recent: false,
+            },
+            now,
+        );
+        let new = usage_rank::rank_entries(usage.clone(), opts, now);
+
+        println!(
+            "{} distinct commands | mode={:?} pin_most_recent={}",
+            usage.len(),
+            opts.mode,
+            opts.pin_most_recent
+        );
+        println!("{:>4}  {:>9}  {:>4}  {}", "#", "score", "uses", "command");
+        for (i, e) in new.iter().take(top).enumerate() {
+            println!(
+                "{:>4}  {:>9.4}  {:>4}  {}",
+                i + 1,
+                e.frecency(now),
+                e.occurrences,
+                e.command
+            );
+        }
+        println!("\n-- previous (pure positional recency) top {top} --");
+        for (i, c) in old.iter().take(top).enumerate() {
+            println!("{:>4}  {c}", i + 1);
+        }
+        return Ok(());
+    }
+
+    let usage = read_usage()?;
+    if usage.is_empty() {
+        return Ok(());
+    }
+
     let query = parse_query(&args);
+
+    // ── Usage frecency ──────────────────────────────────────────────
+    // Time-decayed usage frequency, so a command the operator leans on rises
+    // over one they ran once. Both inputs come free from the history file: the
+    // `: <epoch>:0;` timestamp (988 of 1008 lines on the live fleet) and the
+    // repeat count that the old `HashMap::insert` dedup destroyed.
+    let mut entries = usage_rank::rank(usage, cfg.history.rank_options(), now_unix());
 
     // ── Tag priority ────────────────────────────────────────────────
     // Applied to the FEED, because the picker runs `no_sort(true)` —
     // skim will not re-rank, so this order is literally what the operator
-    // sees. Stable, so the most-recent-first ordering above survives
-    // intact inside each tag tier.
-    let tags = TagSet::new(&skim_tab::config::load().tags);
+    // sees. Stable, so the frecency ordering above survives intact *inside*
+    // each tag tier: tags choose the tier, frecency chooses the order within
+    // one. Must therefore run AFTER the frecency pass, never before.
+    let tags = TagSet::new(&cfg.tags);
     if tags.applies_to_history() {
         tags.rank(&mut entries, String::as_str);
     }

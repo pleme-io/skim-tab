@@ -59,6 +59,52 @@ pub struct Config {
     /// Tab completion picker. Empty `rules` (the default) is identity —
     /// see [`crate::tags`] for the semantics.
     pub tags: crate::tags::TagsConfig,
+
+    /// Ctrl-R history picker ordering. See [`HistoryConfig`].
+    pub history: HistoryConfig,
+}
+
+// ── History picker config ───────────────────────────────────────────
+
+/// How the Ctrl-R history feed is ordered.
+///
+/// Unlike the completion-enrichment flags above, this defaults **on**: the
+/// pre-frecency ordering discarded the timestamp and the repeat count that the
+/// history file already carries, so leaving it off would mean shipping a
+/// ranking that cannot see the signal it is meant to rank by. The
+/// `pin_most_recent` guard is what makes defaulting on safe — see
+/// [`crate::usage_rank`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HistoryConfig {
+    /// `frecency` (default) weights time-decayed usage frequency;
+    /// `recency` reproduces the pre-frecency positional order exactly.
+    pub ranking: crate::usage_rank::RankMode,
+
+    /// Keep the most-recently-executed command at the top regardless of
+    /// score, protecting the "re-run what I just ran" reflex from a command
+    /// that is merely used more often. Default `true`.
+    pub pin_most_recent: bool,
+}
+
+impl Default for HistoryConfig {
+    fn default() -> Self {
+        Self {
+            ranking: crate::usage_rank::RankMode::default(),
+            pin_most_recent: true,
+        }
+    }
+}
+
+impl HistoryConfig {
+    /// The knobs as [`crate::usage_rank`] wants them.
+    #[must_use]
+    pub fn rank_options(&self) -> crate::usage_rank::RankOptions {
+        crate::usage_rank::RankOptions {
+            mode: self.ranking,
+            pin_most_recent: self.pin_most_recent,
+        }
+    }
 }
 
 // ── Completion config ───────────────────────────────────────────────
