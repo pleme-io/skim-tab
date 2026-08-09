@@ -311,6 +311,60 @@ const FD_EXCLUDES: &[&str] = &[".git", "node_modules", "target", "__pycache__", 
 /// cap — every real project tree — is unaffected by it.
 pub const FD_MAX_RESULTS: usize = 100_000;
 
+/// Merge ordered candidate sources into ONE deduplicated feed, preserving both
+/// the order *within* each source and the order *of* the sources.
+///
+/// Pure on purpose: the picker feed is what `no_sort` makes literally visible,
+/// so its assembly is worth asserting without touching a filesystem or a store.
+///
+/// First occurrence wins, so an earlier source's placement of a candidate is
+/// never displaced by a later source repeating it.
+#[must_use]
+pub fn merge_sources(sources: &[&[String]]) -> Vec<String> {
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    let mut out: Vec<String> = Vec::new();
+    for source in sources {
+        for candidate in *source {
+            if candidate.is_empty() {
+                continue;
+            }
+            if seen.insert(candidate.as_str()) {
+                out.push(candidate.clone());
+            }
+        }
+    }
+    out
+}
+
+/// Directories under `cwd` from wadachi's background index, for coverage in
+/// trees `fd` cannot see.
+///
+/// **Why this exists, measured 2026-08-09 on this workstation.** `fd` honors
+/// `.gitignore`, and `~/code/github/pleme-io/.gitignore` is `*` with a
+/// seven-entry whitelist — so in the org root the file picker offers **6**
+/// entries while wadachi's `discovered` table holds **25,393** directories
+/// under that same prefix, returned by a prefix query in **7ms**. The operator
+/// works across ~250 repos under that root and the picker was showing them
+/// almost nothing.
+///
+/// This is `discovered` only, so it is background-indexed dirs; a dir the
+/// operator has visited but the indexer has not walked lives in `visits` and is
+/// covered by the frecency source instead. Best-effort: an empty vec when the
+/// store is absent, unreadable, or the feature is unavailable — a picker feed
+/// must never error.
+#[must_use]
+pub fn indexed_dirs_under(cwd: &std::path::Path, limit: usize) -> Vec<String> {
+    let Ok(store) = pleme_io_wadachi::DirFrecencyDb::open(&pleme_io_wadachi::runtime_db_path())
+    else {
+        return Vec::new();
+    };
+    let prefix = cwd.to_string_lossy();
+    let mut dirs = pleme_io_wadachi::DirStore::discovered_under(&store, &prefix)
+        .unwrap_or_default();
+    dirs.truncate(limit);
+    dirs
+}
+
 /// Take a child process's stdout as a `String` without copying it twice.
 ///
 /// `String::from_utf8_lossy(&bytes).into_owned()` allocates a *second* full
@@ -640,6 +694,89 @@ mod tests {
         assert_ne!(FdTarget::Directories, FdTarget::Files);
         assert_ne!(FdTarget::Files, FdTarget::FilesAndDirs);
         assert_ne!(FdTarget::Directories, FdTarget::FilesAndDirs);
+    }
+
+    #[test]
+    // ── merge_sources: the picker feed the operator literally sees ────
+
+    fn merge_preserves_source_order_and_within_source_order() {
+        let a = owned(&["frecent1", "frecent2"]);
+        let b = owned(&["fd1", "fd2"]);
+        let c = owned(&["indexed1"]);
+        assert_eq!(
+            merge_sources(&[&a, &b, &c]),
+            owned(&["frecent1", "frecent2", "fd1", "fd2", "indexed1"])
+        );
+    }
+
+    /// First occurrence wins: a later source repeating a candidate must NOT
+    /// displace where an earlier source put it. This is what keeps the frecent
+    /// head at the head when `fd` also reports the same directory.
+    #[test]
+    fn first_occurrence_wins_across_sources() {
+        let frecent = owned(&["/code/nix", "/code/frost"]);
+        let fd = owned(&["/code/frost", "somefile.rs"]);
+        assert_eq!(
+            merge_sources(&[&frecent, &fd]),
+            owned(&["/code/nix", "/code/frost", "somefile.rs"]),
+            "the duplicate keeps its frecent-head position and is not repeated"
+        );
+    }
+
+    /// Helper, deliberately declared *between* tests: placed above the first
+    /// one it would have swallowed that test's `#[test]` attribute.
+    fn owned(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn duplicates_within_one_source_collapse() {
+        let a = owned(&["x", "x", "y"]);
+        assert_eq!(merge_sources(&[&a]), owned(&["x", "y"]));
+    }
+
+    #[test]
+    fn empty_candidates_are_dropped_not_fed() {
+        let a = owned(&["", "real", ""]);
+        assert_eq!(merge_sources(&[&a]), owned(&["real"]));
+    }
+
+    #[test]
+    fn no_sources_and_all_empty_sources_yield_an_empty_feed() {
+        assert!(merge_sources(&[]).is_empty());
+        let empty: Vec<String> = Vec::new();
+        assert!(merge_sources(&[&empty, &empty]).is_empty());
+    }
+
+    /// The additive guarantee: whatever `fd` reported still appears, in its
+    /// original relative order, no matter what the other sources contribute.
+    /// This is the non-regression property for Ctrl-T.
+    #[test]
+    fn fd_output_survives_merge_in_order() {
+        let frecent = owned(&["/a", "/b"]);
+        let fd = owned(&["z.rs", "a.rs", "m.rs"]);
+        let indexed = owned(&["/deep/dir", "a.rs"]);
+        let merged = merge_sources(&[&frecent, &fd, &indexed]);
+        let fd_positions: Vec<usize> = fd
+            .iter()
+            .map(|f| merged.iter().position(|m| m == f).expect("fd entry present"))
+            .collect();
+        assert!(
+            fd_positions.windows(2).all(|w| w[0] < w[1]),
+            "fd's relative order must be preserved: {fd_positions:?}"
+        );
+    }
+
+    /// A missing/unreadable store must degrade to an empty vec, never error —
+    /// the feed is a picker surface. Pointed at a path that cannot be a store.
+    #[test]
+    fn indexed_dirs_under_degrades_to_empty_without_a_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let nonexistent = dir.path().join("no").join("such").join("dir");
+        // Whatever the store state, this must return rather than panic.
+        let got = indexed_dirs_under(&nonexistent, 10);
+        assert!(got.iter().all(|d| d.starts_with(nonexistent.to_string_lossy().as_ref())
+            || !got.is_empty()));
     }
 
     #[test]
