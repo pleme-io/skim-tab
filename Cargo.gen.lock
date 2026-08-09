@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "cargo_lock_sha256": "6466caa4af0419077dd03d13521b0009cc7988f58e744d6cb76585ac11481689",
+  "cargo_lock_sha256": "fc393815f1fc64c8fcbea870250df7fdb1af343f8479afc5fc2d4a7a7c1d90f4",
   "manifest_sha256": {
-    "Cargo.toml": "9c87933ad75916cbdc87cfb2de17f5fb2724f6c913f86ac80d86e4052fb63c65"
+    "Cargo.toml": "9a898ddbb806a4ae2a11785eea92f4811e954a43267436c16666c821a77239cf"
   },
   "target_resolves": {
     "base": {
@@ -7652,7 +7652,7 @@
           "default"
         ]
       },
-      "skim-tab-0.1.11": {
+      "skim-tab-0.1.12": {
         "runtime_dependencies": [
           {
             "name": "anyhow",
@@ -13208,7 +13208,7 @@
         }
       ]
     },
-    "skim-tab-0.1.11": {
+    "skim-tab-0.1.12": {
       "edition": "2024",
       "lib_target": {
         "name": "skim_tab",
