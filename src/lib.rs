@@ -297,33 +297,103 @@ pub enum FdTarget {
 /// Standard exclusion dirs shared by all `fd` callers.
 const FD_EXCLUDES: &[&str] = &[".git", "node_modules", "target", "__pycache__", ".direnv"];
 
+/// Upper bound on the entries any picker loads from `fd`.
+///
+/// A picker is a *human* selection surface. Past a few thousand rows nobody
+/// scrolls, but every extra entry still costs walk time, a line in the
+/// buffer and a skim item — so the tail of an unbounded walk is pure cost.
+///
+/// Unbounded it is not merely large. Measured on this workstation, a single
+/// `--hidden --follow --type f` walk emitted **34.16M entries / 6.36 GB**:
+/// the terminal froze for 25–30s and the process peaked near 13 GB. `fd`
+/// quits the moment `--max-results` is reached, so any tree smaller than the
+/// cap — every real project tree — is unaffected by it.
+pub const FD_MAX_RESULTS: usize = 100_000;
+
+/// Take a child process's stdout as a `String` without copying it twice.
+///
+/// `String::from_utf8_lossy(&bytes).into_owned()` allocates a *second* full
+/// copy even in the normal case, where the bytes are already valid UTF-8 and
+/// the `Cow` is `Borrowed`. On a multi-gigabyte `fd` walk that second copy is
+/// pure waste. `String::from_utf8` reuses the buffer in place; the lossy path
+/// runs only when the bytes really are malformed.
+#[must_use]
+pub fn into_lossy_string(bytes: Vec<u8>) -> String {
+    match String::from_utf8(bytes) {
+        Ok(s) => s,
+        Err(e) => String::from_utf8_lossy(e.as_bytes()).into_owned(),
+    }
+}
+
+/// Build `fd`'s argument vector for `target`.
+///
+/// Kept separate from the spawn so the bounds below are assertable without
+/// walking a filesystem.
+fn fd_args(target: FdTarget) -> Vec<String> {
+    let mut args: Vec<String> = Vec::new();
+
+    match target {
+        FdTarget::Directories => args.extend(["--type".into(), "d".into()]),
+        FdTarget::Files => args.extend(["--type".into(), "f".into()]),
+        FdTarget::FilesAndDirs => {
+            args.extend(["--type".into(), "f".into(), "--type".into(), "d".into()]);
+        }
+    }
+
+    // List symlinks, never walk through them. `--type l` is the half of
+    // `--follow` that is actually wanted: on a home-manager workstation most
+    // of `~/.config` (nvim, shell, nix, cursor …) IS a symlink into the Nix
+    // store, and with neither flag those entries vanish from the picker
+    // entirely — an empty picker where the operator expects their config.
+    // `--follow` brought them back by descending into each target, which is
+    // what turned a bounded tree into tens of millions of store paths.
+    //
+    // Honest cost: `fd` classifies a symlink by the link, not its target, so
+    // the directory picker also lists file symlinks (and a listed symlink
+    // carries no trailing `/`). Over-listing a handful of leaves is the
+    // cheaper error than silently hiding every symlinked directory.
+    args.extend(["--type".into(), "l".into()]);
+
+    args.push("--hidden".into());
+    for excl in FD_EXCLUDES {
+        args.push("--exclude".into());
+        args.push((*excl).into());
+    }
+    args.push("--strip-cwd-prefix".into());
+    args.push("--max-results".into());
+    args.push(FD_MAX_RESULTS.to_string());
+
+    args
+}
+
 /// Run `fd` with standard exclusions and return its stdout.
 ///
 /// All three file-discovery binaries (cd, files, fvim) share the same
 /// `fd` invocation pattern. This centralizes it.
+///
+/// The walk is **bounded** by [`FD_MAX_RESULTS`] and does **not** follow
+/// symlinks: `--follow` re-walks every symlinked tree, and on a workstation
+/// where `~` links into the Nix store, caches and other checkouts that turns a
+/// bounded directory tree into a near-cyclic graph of tens of millions of
+/// paths. Symlinks are still *listed* (see [`fd_args`]); they are never
+/// descended.
 pub fn fd_discover(target: FdTarget) -> Result<String> {
-    let mut cmd = Command::new("fd");
+    let output = Command::new("fd")
+        .args(fd_args(target))
+        .output()
+        .context("failed to run fd — is it installed?")?;
+    let entries = into_lossy_string(output.stdout);
 
-    match target {
-        FdTarget::Directories => {
-            cmd.args(["--type", "d"]);
-        }
-        FdTarget::Files => {
-            cmd.args(["--type", "f"]);
-        }
-        FdTarget::FilesAndDirs => {
-            cmd.args(["--type", "f", "--type", "d"]);
-        }
+    // At the cap the list the operator is scrolling is a prefix of the tree,
+    // not the tree. Say so on stderr rather than let it read as complete.
+    if entries.lines().count() >= FD_MAX_RESULTS {
+        eprintln!(
+            "skim-tab: fd hit the {FD_MAX_RESULTS} entry cap — showing a partial tree; \
+             run from a narrower directory for a complete list"
+        );
     }
 
-    cmd.args(["--hidden", "--follow"]);
-    for excl in FD_EXCLUDES {
-        cmd.args(["--exclude", excl]);
-    }
-    cmd.arg("--strip-cwd-prefix");
-
-    let output = cmd.output().context("failed to run fd — is it installed?")?;
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    Ok(entries)
 }
 
 #[cfg(test)]
@@ -575,6 +645,100 @@ mod tests {
     fn fd_discover_runs_without_panic() {
         // fd may not be in PATH in CI; just verify no panic
         let _ = fd_discover(FdTarget::Files);
+    }
+
+    /// A picker feed is bounded, and bounded at a size a human could plausibly
+    /// scroll through. Unbounded, this walk measured 34.16M entries / 6.36 GB.
+    #[test]
+    fn fd_result_cap_is_a_picker_sized_bound() {
+        assert!(FD_MAX_RESULTS > 0);
+        assert!(
+            FD_MAX_RESULTS <= 1_000_000,
+            "a cap this large is not a bound on a picker feed"
+        );
+    }
+
+    /// `--follow` is what turned a bounded tree into 34.16M entries: on a
+    /// workstation `~` links into the Nix store, caches and other checkouts,
+    /// and re-walking each one makes the tree a near-cyclic graph.
+    #[test]
+    fn fd_never_follows_symlinks() {
+        for target in [
+            FdTarget::Directories,
+            FdTarget::Files,
+            FdTarget::FilesAndDirs,
+        ] {
+            let args = fd_args(target);
+            assert!(
+                !args.iter().any(|a| a == "--follow" || a == "-L"),
+                "{target:?} re-introduced symlink following: {args:?}"
+            );
+        }
+    }
+
+    /// …but a symlink is still LISTED. Dropping `--follow` without `--type l`
+    /// empties the picker anywhere home-manager owns the tree, because every
+    /// entry under `~/.config` is a symlink into the Nix store.
+    #[test]
+    fn fd_lists_symlinks_without_descending_them() {
+        for target in [
+            FdTarget::Directories,
+            FdTarget::Files,
+            FdTarget::FilesAndDirs,
+        ] {
+            let args = fd_args(target);
+            let types: Vec<&String> = args
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i > 0 && args[i - 1] == "--type")
+                .map(|(_, a)| a)
+                .collect();
+            assert!(
+                types.iter().any(|t| *t == "l"),
+                "{target:?} drops symlinks from the feed: {args:?}"
+            );
+        }
+    }
+
+    /// Every `fd` walk carries the cap — all three pickers share one call
+    /// site, so one missing flag would leave one of them unbounded.
+    #[test]
+    fn fd_walks_are_capped() {
+        for target in [
+            FdTarget::Directories,
+            FdTarget::Files,
+            FdTarget::FilesAndDirs,
+        ] {
+            let args = fd_args(target);
+            let idx = args
+                .iter()
+                .position(|a| a == "--max-results")
+                .unwrap_or_else(|| panic!("{target:?} walk is unbounded: {args:?}"));
+            assert_eq!(args[idx + 1], FD_MAX_RESULTS.to_string());
+        }
+    }
+
+    #[test]
+    fn fd_args_keep_the_standard_exclusions() {
+        let args = fd_args(FdTarget::Files);
+        for excl in FD_EXCLUDES {
+            assert!(args.iter().any(|a| a == excl), "lost exclusion {excl}");
+        }
+        assert!(args.iter().any(|a| a == "--hidden"));
+        assert!(args.iter().any(|a| a == "--strip-cwd-prefix"));
+    }
+
+    #[test]
+    fn into_lossy_string_keeps_valid_utf8() {
+        let valid = b"src/main.rs\n".to_vec();
+        assert_eq!(into_lossy_string(valid), "src/main.rs\n");
+    }
+
+    #[test]
+    fn into_lossy_string_replaces_invalid_bytes() {
+        let out = into_lossy_string(vec![b'a', 0xff, b'b']);
+        assert!(out.starts_with('a') && out.ends_with('b'));
+        assert!(out.contains('\u{fffd}'), "invalid byte kept: {out:?}");
     }
 
     #[test]
