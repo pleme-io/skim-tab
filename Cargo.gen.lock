@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "cargo_lock_sha256": "95356034f2f50607c0581fba0c3f4006c704e3954d6b07541e9a9c27eea631d0",
+  "cargo_lock_sha256": "6924752caa86ccf1c4d06b0f89c91898885599ec38ec63a83e94c1dd8cfe0e2b",
   "manifest_sha256": {
-    "Cargo.toml": "6bd53d198efde1e1da85fd0c5516cffc22c98fa5cc5a3372e4b23a4d284ffc05"
+    "Cargo.toml": "b64bc28add6224355caa599f8e6a729af265bd4b925b3d0a4ca1ae521ef27aac"
   },
   "target_resolves": {
     "base": {
@@ -6974,7 +6974,7 @@
           "std"
         ]
       },
-      "shikumi-0.1.522-eaf54a39f22bbcf042aa17ed35ea56449def4266": {
+      "shikumi-0.1.523-6efab69c0faf1caab94fefa154855559b0d1fc47": {
         "runtime_dependencies": [
           {
             "name": "arc_swap",
@@ -7668,7 +7668,7 @@
           "default"
         ]
       },
-      "skim-tab-0.1.14": {
+      "skim-tab-0.1.15": {
         "runtime_dependencies": [
           {
             "name": "anyhow",
@@ -7792,7 +7792,7 @@
           },
           {
             "name": "shikumi",
-            "package_key": "shikumi-0.1.522-eaf54a39f22bbcf042aa17ed35ea56449def4266",
+            "package_key": "shikumi-0.1.523-6efab69c0faf1caab94fefa154855559b0d1fc47",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -13203,7 +13203,7 @@
     "shell-words-1.1.1": {
       "edition": "2015"
     },
-    "shikumi-0.1.522-eaf54a39f22bbcf042aa17ed35ea56449def4266": {
+    "shikumi-0.1.523-6efab69c0faf1caab94fefa154855559b0d1fc47": {
       "edition": "2024"
     },
     "shlex-1.3.0": {
@@ -13237,7 +13237,7 @@
         }
       ]
     },
-    "skim-tab-0.1.14": {
+    "skim-tab-0.1.15": {
       "edition": "2024",
       "lib_target": {
         "name": "skim_tab",
@@ -13535,7 +13535,7 @@
     }
   },
   "git_nar_sha256": {
-    "shikumi-0.1.522-eaf54a39f22bbcf042aa17ed35ea56449def4266": "sha256-YjQ5rPmEyMsrhHfdA4/VOb4uoSpb0Hr+hvW67o17AP8="
+    "shikumi-0.1.523-6efab69c0faf1caab94fefa154855559b0d1fc47": "sha256-8BHWi5NbwhGTvtOlLMtOcgrusqHOhV5gYZz4+Mox7iU="
   },
   "flake_metadata": {}
 }
