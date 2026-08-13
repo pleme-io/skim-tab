@@ -256,14 +256,34 @@ fn handle_client(server: &Server, stream: UnixStream) -> Result<()> {
 /// Default socket path: `$XDG_RUNTIME_DIR/skim-tab.socket` if set, otherwise
 /// `$TMPDIR/skim-tab.<user>.socket`, otherwise `/tmp/skim-tab.<user>.socket`.
 pub fn default_socket() -> PathBuf {
-    if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
-        return PathBuf::from(dir).join("skim-tab.socket");
+    default_socket_from(&okiba::Okiba::for_app("skim-tab"))
+}
+
+/// The resolution itself, against an explicit [`okiba::Okiba`] — the seam that
+/// lets the invariant below be tested without mutating `std::env`.
+fn default_socket_from(places: &okiba::Okiba) -> PathBuf {
+    // $XDG_RUNTIME_DIR, but only if ABSOLUTE. It used to be taken verbatim:
+    //
+    //     if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
+    //         return PathBuf::from(dir).join("skim-tab.socket");
+    //
+    // so XDG_RUNTIME_DIR="" produced the bare relative path
+    // "skim-tab.socket" — a socket in whatever directory the process started
+    // in. The daemon and the client then bind and dial different sockets,
+    // each sees no peer, and completion silently stops working while both
+    // processes look healthy.
+    if let Ok(dir) = places.base(okiba::Tier::Runtime) {
+        return dir.join("skim-tab.socket");
     }
     let user = std::env::var("USER").unwrap_or_else(|_| "default".to_string());
-    let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_string());
-    // Strip trailing slash from TMPDIR (macOS sets it with one)
-    let tmp = tmp.trim_end_matches('/');
-    PathBuf::from(tmp).join(format!("skim-tab.{user}.socket"))
+    // TMPDIR had the SAME hole — a relative value landed the socket in the
+    // cwd just as surely. macOS sets it with a trailing slash, hence the trim.
+    let tmp = std::env::var("TMPDIR")
+        .ok()
+        .map(|t| PathBuf::from(t.trim_end_matches('/').to_string()))
+        .filter(|p| p.is_absolute())
+        .unwrap_or_else(std::env::temp_dir);
+    tmp.join(format!("skim-tab.{user}.socket"))
 }
 
 /// Send a single request to the daemon and read one line of response.
@@ -378,9 +398,17 @@ pub fn prefetch(socket: &Path, command: &str, words: &[&str]) -> Result<CachedPr
 /// [`default_socket`]. Returns `None` if the resolved path doesn't exist —
 /// the client should then use the local `SpecRegistry` instead.
 pub fn socket_if_alive() -> Option<PathBuf> {
+    // BOTH arms are absolute-only, and that is the whole point. Hardening the
+    // fallback while leaving the OVERRIDE raw is the shape this bug keeps
+    // taking — a correct branch masking an incorrect one, so the code reads as
+    // guarded and the unguarded path is the one an operator actually sets.
+    // `default_socket` resolves through okiba; this arm has to match it or the
+    // guarantee is decorative.
     let path = std::env::var("SKIM_TAB_DAEMON_SOCKET")
+        .ok()
         .map(PathBuf::from)
-        .unwrap_or_else(|_| default_socket());
+        .filter(|p| p.is_absolute())
+        .unwrap_or_else(default_socket);
     if path.exists() { Some(path) } else { None }
 }
 

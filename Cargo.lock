@@ -1772,6 +1772,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "okiba"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb7f9cb9982c5086e786c73b7c5dcca67937ffede389cc9c92928a7ab5b01148"
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2741,6 +2747,7 @@ dependencies = [
  "libc",
  "lscolors",
  "nix 0.29.0",
+ "okiba",
  "pleme-io-wadachi",
  "proptest",
  "regex",

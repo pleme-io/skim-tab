@@ -54,6 +54,11 @@ path = "src/kpod.rs"
 
 
 [dependencies]
+# okiba (置き場) — XDG resolution where a RELATIVE or empty override is IGNORED
+# per spec rather than joined. default_socket took $XDG_RUNTIME_DIR verbatim,
+# so an empty one put the daemon socket in the cwd and the daemon and client
+# stopped finding each other.
+okiba = "0.2"
 skim = "3.7"
 regex = "1"
 anyhow = "1.0"
