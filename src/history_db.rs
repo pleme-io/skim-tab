@@ -140,17 +140,35 @@ impl HistoryDb {
 
     /// Resolve the database path.
     fn db_path() -> PathBuf {
-        if let Ok(data_dir) = std::env::var("XDG_DATA_HOME") {
-            PathBuf::from(data_dir)
-                .join("skim-tab")
-                .join("selections.db")
-        } else if let Ok(home) = std::env::var("HOME") {
-            PathBuf::from(home)
-                .join(".local/share/skim-tab")
-                .join("selections.db")
-        } else {
-            PathBuf::from("/tmp/skim-tab-selections.db")
-        }
+        Self::db_path_from(&okiba::Okiba::for_app("skim-tab"))
+    }
+
+    /// The resolution itself, against an explicit [`okiba::Okiba`] — the seam
+    /// that lets the invariant be tested without mutating `std::env`.
+    fn db_path_from(places: &okiba::Okiba) -> PathBuf {
+        // BOTH env arms are absolute-only now. They used to be taken verbatim:
+        //
+        //     if let Ok(data_dir) = std::env::var("XDG_DATA_HOME") {
+        //         PathBuf::from(data_dir).join("skim-tab").join("selections.db")
+        //     } else if let Ok(home) = std::env::var("HOME") {
+        //         PathBuf::from(home).join(".local/share/skim-tab")…
+        //
+        // so XDG_DATA_HOME="" produced the RELATIVE "skim-tab/selections.db"
+        // and HOME="" produced ".local/share/skim-tab/selections.db". Nothing
+        // errors on that: `open` calls create_dir_all on the relative parent
+        // and it succeeds, so every cwd silently gets its own fresh empty
+        // frecency db and ranking degrades to "no history" while littering the
+        // tree. The absolute literal third arm is what made this read as
+        // guarded — the two arms an operator actually sets were the raw ones.
+        //
+        // try_path, not path: okiba's infallible form falls back to
+        // std::env::temp_dir(), which does NOT itself filter for absolute —
+        // and this literal preserves the pre-fix third arm byte for byte, so
+        // no configuration that resolves absolutely today resolves anywhere
+        // different.
+        places
+            .try_path(okiba::Tier::Data, "selections.db")
+            .unwrap_or_else(|_| PathBuf::from("/tmp/skim-tab-selections.db"))
     }
 }
 
@@ -497,6 +515,83 @@ mod tests {
         let path = HistoryDb::db_path();
         let path_str = path.to_str().unwrap();
         assert!(path_str.contains("skim-tab") && path_str.contains("selections.db"));
+    }
+
+    // ── db_path is ABSOLUTE on every arm (the masked-branch invariant) ──
+    //
+    // These drive `db_path_from` against an explicit okiba rather than
+    // mutating `std::env`, which races under parallel test execution — and
+    // which is why the three tests above can only ever exercise the arms that
+    // already worked.
+
+    fn places(pairs: &[(&str, &str)]) -> okiba::Okiba {
+        let owned: Vec<(String, String)> = pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect();
+        okiba::Okiba::from_env("skim-tab", move |name| {
+            owned
+                .iter()
+                .find(|(k, _)| k == name)
+                .map(|(_, v)| v.clone())
+        })
+    }
+
+    /// The bug: an EMPTY `XDG_DATA_HOME` used to yield the relative
+    /// `skim-tab/selections.db`, so the sqlite db was created in whatever
+    /// directory the shell happened to be in.
+    #[test]
+    fn db_path_ignores_empty_xdg_data_home() {
+        let path = HistoryDb::db_path_from(&places(&[("XDG_DATA_HOME", ""), ("HOME", "/home/u")]));
+        assert!(path.is_absolute(), "{} is relative", path.display());
+        assert_eq!(
+            path,
+            PathBuf::from("/home/u/.local/share/skim-tab/selections.db")
+        );
+    }
+
+    /// Same hole, relative rather than empty.
+    #[test]
+    fn db_path_ignores_relative_xdg_data_home() {
+        let path = HistoryDb::db_path_from(&places(&[
+            ("XDG_DATA_HOME", "rel/dir"),
+            ("HOME", "/home/u"),
+        ]));
+        assert!(path.is_absolute(), "{} is relative", path.display());
+        assert_eq!(
+            path,
+            PathBuf::from("/home/u/.local/share/skim-tab/selections.db")
+        );
+    }
+
+    /// The second unguarded arm — an empty or relative `HOME` used to yield
+    /// `.local/share/skim-tab/selections.db`, also in the cwd.
+    #[test]
+    fn db_path_ignores_unusable_home() {
+        for home in ["", "rel/home"] {
+            let path = HistoryDb::db_path_from(&places(&[("HOME", home)]));
+            assert!(path.is_absolute(), "HOME={home:?} gave {}", path.display());
+            assert_eq!(path, PathBuf::from("/tmp/skim-tab-selections.db"));
+        }
+    }
+
+    /// No configuration that resolves ABSOLUTELY today may move. An existing
+    /// user's db has to keep being found.
+    #[test]
+    fn db_path_preserves_every_valid_resolution() {
+        assert_eq!(
+            HistoryDb::db_path_from(&places(&[("XDG_DATA_HOME", "/x"), ("HOME", "/home/u")])),
+            PathBuf::from("/x/skim-tab/selections.db"),
+        );
+        assert_eq!(
+            HistoryDb::db_path_from(&places(&[("HOME", "/home/u")])),
+            PathBuf::from("/home/u/.local/share/skim-tab/selections.db"),
+        );
+        // Both unusable: the pre-fix third arm, byte for byte.
+        assert_eq!(
+            HistoryDb::db_path_from(&places(&[])),
+            PathBuf::from("/tmp/skim-tab-selections.db"),
+        );
     }
 
     // ── MemHistoryStore isolation ─────────────────────────────────────
