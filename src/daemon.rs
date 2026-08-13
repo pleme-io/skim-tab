@@ -273,7 +273,7 @@ fn default_socket_from(places: &okiba::Okiba) -> PathBuf {
     // each sees no peer, and completion silently stops working while both
     // processes look healthy.
     if let Ok(dir) = places.base(okiba::Tier::Runtime) {
-        return dir.join("skim-tab.socket");
+        return dir.join("skim-tab.socket").into_path_buf();
     }
     let user = std::env::var("USER").unwrap_or_else(|_| "default".to_string());
     // TMPDIR had the SAME hole — a relative value landed the socket in the

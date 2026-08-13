@@ -168,7 +168,11 @@ impl HistoryDb {
         // different.
         places
             .try_path(okiba::Tier::Data, "selections.db")
-            .unwrap_or_else(|_| PathBuf::from("/tmp/skim-tab-selections.db"))
+            .unwrap_or_else(|_| {
+                okiba::AbsPath::new("/tmp/skim-tab-selections.db")
+                    .expect("a /tmp-rooted literal is absolute")
+            })
+            .into_path_buf()
     }
 }
 

@@ -58,7 +58,7 @@ path = "src/kpod.rs"
 # per spec rather than joined. default_socket took $XDG_RUNTIME_DIR verbatim,
 # so an empty one put the daemon socket in the cwd and the daemon and client
 # stopped finding each other.
-okiba = "0.2"
+okiba = "0.3"
 skim = "3.7"
 regex = "1"
 anyhow = "1.0"
