@@ -39,12 +39,31 @@ fn now_unix() -> i64 {
 }
 
 /// Resolve the history file path.
+///
+/// `$HISTFILE` is taken VERBATIM, including a relative one, and that is
+/// deliberate: zsh itself resolves a relative `HISTFILE` against the cwd, so
+/// rejecting one here would make skim-tab disagree with the shell whose
+/// history it is reading. Faithfulness to the shell beats the absolute rule on
+/// this specific variable — see `theory/MASKED-BRANCH.md` §V on not changing
+/// what a valid configuration resolves to.
+///
+/// `$HOME` is different. It used to fall back to `"."`, which is not a
+/// plausible home directory — it made the path `./.zsh_history`, so the
+/// ranking silently read the cwd's history, or nothing at all, depending on
+/// where the process started. An unusable `$HOME` now yields an absolute path
+/// that simply does not exist, which the caller already handles as "no
+/// history" instead of quietly reading the wrong file.
 fn history_path() -> PathBuf {
-    if let Ok(path) = env::var("HISTFILE") {
+    if let Some(path) = env::var_os("HISTFILE") {
         return PathBuf::from(path);
     }
-    let home = env::var("HOME").unwrap_or_else(|_| ".".into());
-    PathBuf::from(home).join(".zsh_history")
+    if let Some(home) = env::var_os("HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+    {
+        return home.join(".zsh_history");
+    }
+    std::env::temp_dir().join("skim-tab-no-home.zsh_history")
 }
 
 /// Read the resolved `$HISTFILE` as accumulated per-command usage.
