@@ -532,6 +532,36 @@ pub fn ensure_socket() -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    /// Points `SKIM_TAB_DAEMON_SOCKET` at `path` for one test and restores it on
+    /// drop. The process environment is shared by tests running in parallel,
+    /// so every test that sets the variable holds the same lock; without it two
+    /// tests raced and one read the other's socket.
+    struct SocketEnv {
+        original: Option<String>,
+        _lock: std::sync::MutexGuard<'static, ()>,
+    }
+
+    impl SocketEnv {
+        fn set(path: &std::path::Path) -> Self {
+            static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+            let lock = LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let original = std::env::var("SKIM_TAB_DAEMON_SOCKET").ok();
+            unsafe { std::env::set_var("SKIM_TAB_DAEMON_SOCKET", path) };
+            Self { original, _lock: lock }
+        }
+    }
+
+    impl Drop for SocketEnv {
+        fn drop(&mut self) {
+            unsafe {
+                match self.original.take() {
+                    Some(v) => std::env::set_var("SKIM_TAB_DAEMON_SOCKET", v),
+                    None => std::env::remove_var("SKIM_TAB_DAEMON_SOCKET"),
+                }
+            }
+        }
+    }
+
     fn test_server() -> Server {
         Server::new(&config::SpecsConfig::default())
     }
@@ -723,29 +753,15 @@ mod tests {
     fn socket_if_alive_returns_none_when_path_missing() {
         let dir = tempfile::tempdir().unwrap();
         let bogus = dir.path().join("does-not-exist.socket");
-        let original = std::env::var("SKIM_TAB_DAEMON_SOCKET").ok();
-        unsafe { std::env::set_var("SKIM_TAB_DAEMON_SOCKET", &bogus); }
+        let _env = SocketEnv::set(&bogus);
         assert!(socket_if_alive().is_none());
-        unsafe {
-            match original {
-                Some(v) => std::env::set_var("SKIM_TAB_DAEMON_SOCKET", v),
-                None => std::env::remove_var("SKIM_TAB_DAEMON_SOCKET"),
-            }
-        }
     }
 
     #[test]
     fn socket_if_alive_returns_some_when_socket_exists() {
         let (_dir, socket) = start_test_daemon();
-        let original = std::env::var("SKIM_TAB_DAEMON_SOCKET").ok();
-        unsafe { std::env::set_var("SKIM_TAB_DAEMON_SOCKET", &socket); }
+        let _env = SocketEnv::set(&socket);
         assert_eq!(socket_if_alive(), Some(socket));
-        unsafe {
-            match original {
-                Some(v) => std::env::set_var("SKIM_TAB_DAEMON_SOCKET", v),
-                None => std::env::remove_var("SKIM_TAB_DAEMON_SOCKET"),
-            }
-        }
     }
 
     #[test]
@@ -815,31 +831,17 @@ mod tests {
     fn poll_for_socket_returns_none_when_socket_never_appears() {
         let dir = tempfile::tempdir().unwrap();
         let bogus = dir.path().join("never-appears.socket");
-        let original = std::env::var("SKIM_TAB_DAEMON_SOCKET").ok();
-        unsafe { std::env::set_var("SKIM_TAB_DAEMON_SOCKET", &bogus); }
+        let _env = SocketEnv::set(&bogus);
         // Tiny synthetic schedule — this test only exercises the
         // give-up-cleanly path, not real timing.
         assert!(poll_for_socket(&[1, 1]).is_none());
-        unsafe {
-            match original {
-                Some(v) => std::env::set_var("SKIM_TAB_DAEMON_SOCKET", v),
-                None => std::env::remove_var("SKIM_TAB_DAEMON_SOCKET"),
-            }
-        }
     }
 
     #[test]
     fn poll_for_socket_finds_socket_already_present() {
         let (_dir, socket) = start_test_daemon();
-        let original = std::env::var("SKIM_TAB_DAEMON_SOCKET").ok();
-        unsafe { std::env::set_var("SKIM_TAB_DAEMON_SOCKET", &socket); }
+        let _env = SocketEnv::set(&socket);
         assert_eq!(poll_for_socket(&[1, 1, 1]), Some(socket));
-        unsafe {
-            match original {
-                Some(v) => std::env::set_var("SKIM_TAB_DAEMON_SOCKET", v),
-                None => std::env::remove_var("SKIM_TAB_DAEMON_SOCKET"),
-            }
-        }
     }
 
     #[test]
@@ -848,8 +850,7 @@ mod tests {
         // short-circuit before ever spawning `launchctl kickstart` or
         // sleeping through the backoff schedule.
         let (_dir, socket) = start_test_daemon();
-        let original = std::env::var("SKIM_TAB_DAEMON_SOCKET").ok();
-        unsafe { std::env::set_var("SKIM_TAB_DAEMON_SOCKET", &socket); }
+        let _env = SocketEnv::set(&socket);
         let start = std::time::Instant::now();
         let result = ensure_socket();
         let elapsed = start.elapsed();
@@ -863,11 +864,5 @@ mod tests {
             elapsed < std::time::Duration::from_millis(200),
             "fast path took {elapsed:?}, expected a plain fs check with no kickstart/backoff"
         );
-        unsafe {
-            match original {
-                Some(v) => std::env::set_var("SKIM_TAB_DAEMON_SOCKET", v),
-                None => std::env::remove_var("SKIM_TAB_DAEMON_SOCKET"),
-            }
-        }
     }
 }
