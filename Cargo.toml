@@ -71,7 +71,12 @@ shikumi = { git = "https://github.com/pleme-io/shikumi" }
 # command-history frecency_score delegates here so it can never drift from
 # wadachi's directory frecency (the extraction the design calls for). Git source
 # (same workspace as pleme-io-wadachi below) so there is one wadachi-spec.
-wadachi-spec = "0.1.4"
+# usage_rank's accumulation and ordering live in wadachi_spec::usage, which is
+# not on crates.io yet (wadachi's release job has failed since 2026-08-08).
+# Until it is, pleme-io-wadachi below still brings its registry copy; the two
+# never exchange a type (skim-cd reads paths out of wadachi::top_n). Return
+# this to a version requirement when wadachi-spec publishes again.
+wadachi-spec = { git = "https://github.com/pleme-io/wadachi" }
 # pleme-io-wadachi (lib imported as `wadachi`) — skim-cd is a READER: it ranks
 # the directory picker by frecency via wadachi::top_n. It never records (the
 # shell already did at cd time — single-recorder rule). Git source for the

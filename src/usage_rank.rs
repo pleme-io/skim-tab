@@ -3,126 +3,21 @@
 //! ## Why this module exists
 //!
 //! `skim-history` (Ctrl-R) used to throw the ranking signal away **twice**:
+//! the parser discarded the unix timestamp zsh's extended format carries on
+//! nearly every line (988 of 1008 on the live fleet history), and the reader
+//! deduplicated with `HashMap::insert`, destroying the repeat count. What was
+//! left was pure positional recency.
 //!
-//! 1. [`crate::usage_rank::parse_history_entry`]'s predecessor returned the
-//!    slice *after* the `;`, discarding the unix timestamp that zsh's extended
-//!    format carries on nearly every line (measured on the live fleet history:
-//!    988 of 1008 lines).
-//! 2. The reader deduplicated into a `HashMap<String, usize>` with
-//!    `insert`, so N occurrences of a command collapsed to one and the
-//!    **repeat count was destroyed at read time**.
+//! ## The ranking lives in `wadachi_spec::usage`
 //!
-//! What was left was pure *positional recency* over deduplicated commands. A
-//! command run forty times ranked exactly like a command run once.
-//!
-//! ## The formula is borrowed, not reinvented
-//!
-//! Scoring goes through [`wadachi_spec::DecayKind`] — the fleet's one frecency
-//! decay, already a dependency of this crate. We deliberately do **not** route
-//! through `wadachi_spec::apply`/`MatchProfile`: that matcher is *path-shaped*
-//! (it reasons in components/basename/ancestors), and a command line is not a
-//! path. Feeding command text to it mis-tokenizes on `/` — measured as an 8×
-//! ranking distortion between two commands with identical visit counts
-//! (`grep -rn foo lib` → 4.0 versus `grep -rn foo src/lib.rs` → 0.5). Needle
-//! matching stays where it already works: inside skim.
-//!
-//! So this module borrows the **decay**, and owns only the accumulation and
-//! the ordering.
-//!
-//! ## The muscle-memory invariant
-//!
-//! Frequency ranking competes with the dominant Ctrl-R use — *re-run the thing
-//! I ran two commands ago*. Because hyperbolic-days decay is nearly flat
-//! within a day (age 5min → 0.9965, age 1h → 0.976), a command run forty times
-//! last week will outscore the command you just ran. Ranking on frecency alone
-//! would therefore make the most common interaction **worse**.
-//!
-//! [`RankOptions::pin_most_recent`] resolves that: the single most-recently
-//! executed command is placed first unconditionally, and frecency orders
-//! everything beneath it. `most_recent_is_pinned_above_a_far_more_frequent_command`
-//! is the regression test for exactly that.
+//! Accumulation, [`RankMode`], [`RankOptions`] (including the pin that keeps
+//! "re-run what I just ran" first) and the ordering were born here and now
+//! live in [`wadachi_spec::usage`], so every history picker in the fleet
+//! (this one, arnes's prompt history) orders its feed one way. This module
+//! keeps what is zsh-specific: reading a history line into a
+//! `(timestamp, command)` pair.
 
-use std::collections::HashMap;
-
-use serde::{Deserialize, Serialize};
-
-/// Seconds in a day, as `f64` — the unit [`wadachi_spec::DecayKind`] decays in.
-const SECS_PER_DAY: f64 = 86_400.0;
-
-/// How a picker feed is ordered.
-///
-/// `Recency` is retained as a *named selection* rather than deleted, so the
-/// pre-frecency ordering stays reachable for an operator who prefers it
-/// (MODULARIZE, DON'T DELETE).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum RankMode {
-    /// Time-decayed frequency: `Σ 1/(1 + age_days)` over every occurrence.
-    /// A command used often *and* recently rises; one used once long ago sinks.
-    #[default]
-    Frecency,
-    /// Pure positional recency over deduplicated commands — the behavior
-    /// shipped before frecency landed.
-    Recency,
-}
-
-/// Knobs for one ranking pass.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RankOptions {
-    /// Ordering to apply.
-    pub mode: RankMode,
-    /// Place the most-recently-executed entry first regardless of score.
-    /// Protects the "re-run what I just ran" reflex from frequency.
-    pub pin_most_recent: bool,
-}
-
-impl Default for RankOptions {
-    fn default() -> Self {
-        Self {
-            mode: RankMode::default(),
-            pin_most_recent: true,
-        }
-    }
-}
-
-/// One distinct command and every time it was observed.
-///
-/// Unlike the `HashMap<String, usize>` this replaced, an entry **accumulates**:
-/// re-running a command appends rather than overwrites, which is what makes
-/// frequency recoverable at all.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UsageEntry {
-    /// The command text, exactly as it will be fed to the picker.
-    pub command: String,
-    /// Unix-epoch seconds for each occurrence that carried a timestamp,
-    /// ascending. Empty when the history file is in plain format.
-    pub timestamps: Vec<i64>,
-    /// File position of the most recent occurrence. Orders `Recency` mode and
-    /// breaks ties in `Frecency` mode, so an untimestamped history still
-    /// ranks sensibly instead of collapsing to an arbitrary order.
-    pub last_ordinal: usize,
-    /// Total occurrences, including any that carried no timestamp. Always
-    /// `>= timestamps.len()`.
-    pub occurrences: usize,
-}
-
-impl UsageEntry {
-    /// `Σ 1/(1 + age_days)` across every timestamped occurrence, using the
-    /// fleet's shared decay from [`wadachi_spec::DecayKind::HyperbolicDays`].
-    ///
-    /// Returns `0.0` when nothing is timestamped — such entries fall back to
-    /// `last_ordinal` ordering rather than being dropped.
-    #[must_use]
-    pub fn frecency(&self, now_unix: i64) -> f64 {
-        self.timestamps
-            .iter()
-            .map(|ts| {
-                let age_days = ((now_unix - ts) as f64 / SECS_PER_DAY).max(0.0);
-                wadachi_spec::DecayKind::HyperbolicDays.decay(age_days, 0.0)
-            })
-            .sum()
-    }
-}
+pub use wadachi_spec::usage::{RankMode, RankOptions, UsageEntry, rank, rank_entries};
 
 /// Split a zsh history line into its optional timestamp and its command.
 ///
@@ -160,88 +55,7 @@ pub fn parse_history_entry(line: &str) -> (Option<i64>, &str) {
 /// command, preserving occurrence counts and timestamps.
 #[must_use]
 pub fn accumulate<'a>(lines: impl IntoIterator<Item = &'a str>) -> Vec<UsageEntry> {
-    let mut index: HashMap<String, usize> = HashMap::new();
-    let mut entries: Vec<UsageEntry> = Vec::new();
-    let mut ordinal = 0usize;
-
-    for line in lines {
-        let (ts, command) = parse_history_entry(line);
-        if command.is_empty() {
-            continue;
-        }
-        let slot = match index.get(command) {
-            Some(&i) => i,
-            None => {
-                entries.push(UsageEntry {
-                    command: command.to_owned(),
-                    timestamps: Vec::new(),
-                    last_ordinal: ordinal,
-                    occurrences: 0,
-                });
-                index.insert(command.to_owned(), entries.len() - 1);
-                entries.len() - 1
-            }
-        };
-        let entry = &mut entries[slot];
-        entry.occurrences += 1;
-        entry.last_ordinal = ordinal;
-        if let Some(ts) = ts {
-            entry.timestamps.push(ts);
-        }
-        ordinal += 1;
-    }
-
-    entries
-}
-
-/// Order `entries` into the feed the picker displays, best-first, keeping the
-/// entries themselves so a caller can report *why* an item landed where it did.
-///
-/// The picker runs with `no_sort(true)`, so this order **is** what the operator
-/// sees — there is no downstream re-sort to correct a mistake here.
-#[must_use]
-pub fn rank_entries(
-    mut entries: Vec<UsageEntry>,
-    opts: RankOptions,
-    now_unix: i64,
-) -> Vec<UsageEntry> {
-    match opts.mode {
-        RankMode::Recency => {
-            entries.sort_by(|a, b| b.last_ordinal.cmp(&a.last_ordinal));
-        }
-        RankMode::Frecency => {
-            // Descending score; `last_ordinal` breaks ties so equal-score
-            // entries stay recency-ordered rather than arbitrary.
-            entries.sort_by(|a, b| {
-                b.frecency(now_unix)
-                    .total_cmp(&a.frecency(now_unix))
-                    .then_with(|| b.last_ordinal.cmp(&a.last_ordinal))
-            });
-        }
-    }
-
-    if opts.pin_most_recent
-        && let Some(newest) = entries
-            .iter()
-            .enumerate()
-            .max_by_key(|(_, e)| e.last_ordinal)
-            .map(|(i, _)| i)
-        && newest != 0
-    {
-        let entry = entries.remove(newest);
-        entries.insert(0, entry);
-    }
-
-    entries
-}
-
-/// [`rank_entries`], reduced to the command strings the picker is fed.
-#[must_use]
-pub fn rank(entries: Vec<UsageEntry>, opts: RankOptions, now_unix: i64) -> Vec<String> {
-    rank_entries(entries, opts, now_unix)
-        .into_iter()
-        .map(|e| e.command)
-        .collect()
+    wadachi_spec::usage::accumulate(lines.into_iter().map(parse_history_entry))
 }
 
 #[cfg(test)]

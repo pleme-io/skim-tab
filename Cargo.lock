@@ -2009,7 +2009,7 @@ dependencies = [
  "notify",
  "rusqlite",
  "serde",
- "wadachi-spec",
+ "wadachi-spec 0.1.7",
 ]
 
 [[package]]
@@ -2760,7 +2760,7 @@ dependencies = [
  "skim",
  "tempfile",
  "thiserror 2.0.18",
- "wadachi-spec",
+ "wadachi-spec 0.1.10",
 ]
 
 [[package]]
@@ -3325,6 +3325,17 @@ name = "wadachi-spec"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "417dce59b05a763108c09a84e219a6292b0a9e0158bb084215e4fa0f667cadba"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "wadachi-spec"
+version = "0.1.10"
+source = "git+https://github.com/pleme-io/wadachi#59d891b8a0079612a03eec617e85525d34fbaf14"
 dependencies = [
  "chrono",
  "serde",
