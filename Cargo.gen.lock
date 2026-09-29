@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "cargo_lock_sha256": "478f1bdb0f115d09e7fcccf2ce0e357fc3cf05b339cea08cc3417ecae7d5cd71",
+  "cargo_lock_sha256": "fd047d245c255c3f3c4ead9f184fdd269372050c60521c08b655635b828c0a5f",
   "manifest_sha256": {
-    "Cargo.toml": "6b82f7d7495ed2a9bc56742112862d063cf776ff6fc16d427e5aa6c1f8529c78"
+    "Cargo.toml": "fa3350bbddb581512aae77415426f47d34422b260fdad015a8c8eb143875056b"
   },
   "target_resolves": {
     "base": {
@@ -5094,7 +5094,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "pleme-io-wadachi-0.1.7": {
+      "pleme-io-wadachi-0.1.11": {
         "runtime_dependencies": [
           {
             "name": "anyhow",
@@ -5188,8 +5188,18 @@
             "tree": "target"
           },
           {
+            "name": "thiserror",
+            "package_key": "thiserror-2.0.18",
+            "kind": "normal",
+            "features": [],
+            "uses_default_features": true,
+            "optional": false,
+            "target": null,
+            "tree": "target"
+          },
+          {
             "name": "wadachi_spec",
-            "package_key": "wadachi-spec-0.1.7",
+            "package_key": "wadachi-spec-0.1.11",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7728,7 +7738,7 @@
           },
           {
             "name": "pleme_io_wadachi",
-            "package_key": "pleme-io-wadachi-0.1.7",
+            "package_key": "pleme-io-wadachi-0.1.11",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7822,7 +7832,7 @@
           },
           {
             "name": "wadachi_spec",
-            "package_key": "wadachi-spec-0.1.10-59d891b8a0079612a03eec617e85525d34fbaf14",
+            "package_key": "wadachi-spec-0.1.11",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -9627,58 +9637,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "wadachi-spec-0.1.10-59d891b8a0079612a03eec617e85525d34fbaf14": {
-        "runtime_dependencies": [
-          {
-            "name": "chrono",
-            "package_key": "chrono-0.4.45",
-            "kind": "normal",
-            "features": [
-              "clock",
-              "serde"
-            ],
-            "uses_default_features": false,
-            "optional": false,
-            "target": null,
-            "tree": "target"
-          },
-          {
-            "name": "serde",
-            "package_key": "serde-1.0.228",
-            "kind": "normal",
-            "features": [
-              "derive"
-            ],
-            "uses_default_features": true,
-            "optional": false,
-            "target": null,
-            "tree": "target"
-          },
-          {
-            "name": "serde_json",
-            "package_key": "serde_json-1.0.151",
-            "kind": "normal",
-            "features": [],
-            "uses_default_features": true,
-            "optional": false,
-            "target": null,
-            "tree": "target"
-          },
-          {
-            "name": "thiserror",
-            "package_key": "thiserror-2.0.18",
-            "kind": "normal",
-            "features": [],
-            "uses_default_features": true,
-            "optional": false,
-            "target": null,
-            "tree": "target"
-          }
-        ],
-        "build_dependencies": [],
-        "features": []
-      },
-      "wadachi-spec-0.1.7": {
+      "wadachi-spec-0.1.11": {
         "runtime_dependencies": [
           {
             "name": "chrono",
@@ -13057,7 +13016,7 @@
     "pkg-config-0.3.33": {
       "edition": "2018"
     },
-    "pleme-io-wadachi-0.1.7": {
+    "pleme-io-wadachi-0.1.11": {
       "edition": "2024",
       "binaries": [
         {
@@ -13525,10 +13484,7 @@
     "vtparse-0.6.2": {
       "edition": "2018"
     },
-    "wadachi-spec-0.1.10-59d891b8a0079612a03eec617e85525d34fbaf14": {
-      "edition": "2024"
-    },
-    "wadachi-spec-0.1.7": {
+    "wadachi-spec-0.1.11": {
       "edition": "2024"
     },
     "wait-timeout-0.2.1": {
@@ -13589,8 +13545,7 @@
     }
   },
   "git_nar_sha256": {
-    "shikumi-0.1.526-92113e3195a0274645b70319d31deceb941063ce": "sha256-b8Np5i02dAps5F+d9p9/6ZWBG9uqksfWjEgGr/1Dm5k=",
-    "wadachi-spec-0.1.10-59d891b8a0079612a03eec617e85525d34fbaf14": "sha256-Iq7JJHIGi6Pkig+rggV7eNSQt7Gg9TjtZdJelkbgWx4="
+    "shikumi-0.1.526-92113e3195a0274645b70319d31deceb941063ce": "sha256-b8Np5i02dAps5F+d9p9/6ZWBG9uqksfWjEgGr/1Dm5k="
   },
   "flake_metadata": {}
 }
