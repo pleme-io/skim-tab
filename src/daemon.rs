@@ -196,10 +196,12 @@ impl Server {
                     .words
                     .iter()
                     .map(|w| {
-                        self.provider.lookup(&req.command, w).map(|(g, d)| LookupHit {
-                            glyph: g.to_string(),
-                            description: d.to_string(),
-                        })
+                        self.provider
+                            .lookup(&req.command, w)
+                            .map(|(g, d)| LookupHit {
+                                glyph: g.to_string(),
+                                description: d.to_string(),
+                            })
                     })
                     .collect(),
             },
@@ -210,10 +212,12 @@ impl Server {
                     .words
                     .iter()
                     .map(|w| {
-                        self.provider.lookup(&req.command, w).map(|(g, d)| LookupHit {
-                            glyph: g.to_string(),
-                            description: d.to_string(),
-                        })
+                        self.provider
+                            .lookup(&req.command, w)
+                            .map(|(g, d)| LookupHit {
+                                glyph: g.to_string(),
+                                description: d.to_string(),
+                            })
                     })
                     .collect(),
             },
@@ -377,10 +381,7 @@ pub fn prefetch(socket: &Path, command: &str, words: &[&str]) -> Result<CachedPr
                     obj.get("glyph").and_then(|g| g.as_str()),
                     obj.get("description").and_then(|d| d.as_str()),
                 ) {
-                    descriptions.insert(
-                        (*word).to_string(),
-                        (glyph.to_string(), desc.to_string()),
-                    );
+                    descriptions.insert((*word).to_string(), (glyph.to_string(), desc.to_string()));
                 }
             }
         }
@@ -544,10 +545,15 @@ mod tests {
     impl SocketEnv {
         fn set(path: &std::path::Path) -> Self {
             static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-            let lock = LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let lock = LOCK
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let original = std::env::var("SKIM_TAB_DAEMON_SOCKET").ok();
             unsafe { std::env::set_var("SKIM_TAB_DAEMON_SOCKET", path) };
-            Self { original, _lock: lock }
+            Self {
+                original,
+                _lock: lock,
+            }
         }
     }
 
@@ -695,11 +701,7 @@ mod tests {
             kind: "lookup_batch".into(),
             command: "kubectl".into(),
             word: String::new(),
-            words: vec![
-                "get".into(),
-                "totally-unknown".into(),
-                "apply".into(),
-            ],
+            words: vec!["get".into(), "totally-unknown".into(), "apply".into()],
         });
         let json = serde_json::to_value(&resp).unwrap();
         let hits = json["hits"].as_array().unwrap();
@@ -769,7 +771,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let original = std::env::var("XDG_RUNTIME_DIR").ok();
         // SAFETY: env mutation; restore in finally-style block at the end.
-        unsafe { std::env::set_var("XDG_RUNTIME_DIR", dir.path()); }
+        unsafe {
+            std::env::set_var("XDG_RUNTIME_DIR", dir.path());
+        }
         let path = default_socket();
         assert_eq!(path, dir.path().join("skim-tab.socket"));
         unsafe {

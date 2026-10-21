@@ -14,7 +14,7 @@ use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim_tab::tags::TagSet;
 use skim_tab::usage_rank::{self, UsageEntry};
-use skim_tab::{base_options, build_options, parse_query, run_skim_on_tty, ICON_HISTORY};
+use skim_tab::{ICON_HISTORY, base_options, build_options, parse_query, run_skim_on_tty};
 
 /// Parse a zsh extended history line, keeping only the command.
 ///
@@ -181,10 +181,7 @@ fn main() -> Result<()> {
     // this is the surface that answers "is it actually ranking my real
     // history, or only my fixtures?".
     if let Some(pos) = args.iter().position(|a| a == "--rank-report") {
-        let top: usize = args
-            .get(pos + 1)
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(15);
+        let top: usize = args.get(pos + 1).and_then(|s| s.parse().ok()).unwrap_or(15);
         let usage = read_usage()?;
         let now = now_unix();
         let opts = cfg.history.rank_options();
@@ -306,7 +303,10 @@ mod tests {
     #[test]
     fn parse_colon_space_but_no_semicolon() {
         // Starts with ": " but has no semicolon → should return full line
-        assert_eq!(parse_history_line(": no semicolon here"), ": no semicolon here");
+        assert_eq!(
+            parse_history_line(": no semicolon here"),
+            ": no semicolon here"
+        );
     }
 
     #[test]
@@ -483,11 +483,7 @@ mod tests {
     /// extended doesn't split the most-recent wins logic.
     #[test]
     fn extended_and_plain_dedup_consistently() {
-        let f = write_hist(&[
-            "echo hi",
-            ": 1709876543:0;echo hi",
-            "echo bye",
-        ]);
+        let f = write_hist(&["echo hi", ": 1709876543:0;echo hi", "echo bye"]);
         let got = read_history_from(f.path()).unwrap();
         assert_eq!(got.first().map(String::as_str), Some("echo bye"));
         // `echo hi` deduped to one entry despite two on-disk encodings.

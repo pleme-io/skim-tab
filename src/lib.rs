@@ -196,7 +196,12 @@ pub fn base_options(query: &str) -> SkimOptionsBuilder {
         .selector_icon(ICON_POINTER.to_string())
         .no_info(true)
         .color(NORD_COLORS.to_string())
-        .bind(STANDARD_BINDS.iter().map(|s| (*s).to_string()).collect::<Vec<_>>());
+        .bind(
+            STANDARD_BINDS
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect::<Vec<_>>(),
+        );
     builder
 }
 
@@ -359,8 +364,8 @@ pub fn indexed_dirs_under(cwd: &std::path::Path, limit: usize) -> Vec<String> {
         return Vec::new();
     };
     let prefix = cwd.to_string_lossy();
-    let mut dirs = pleme_io_wadachi::DirStore::discovered_under(&store, &prefix)
-        .unwrap_or_default();
+    let mut dirs =
+        pleme_io_wadachi::DirStore::discovered_under(&store, &prefix).unwrap_or_default();
     dirs.truncate(limit);
     dirs
 }
@@ -597,10 +602,7 @@ mod tests {
     #[test]
     fn strip_ansi_nested_csi_params() {
         // True-color escape with many params
-        assert_eq!(
-            strip_ansi("\x1b[38;2;136;192;208mfrost\x1b[0m"),
-            "frost"
-        );
+        assert_eq!(strip_ansi("\x1b[38;2;136;192;208mfrost\x1b[0m"), "frost");
     }
 
     // ── parse_query edge cases ───────────────────────────────────────
@@ -759,7 +761,12 @@ mod tests {
         let merged = merge_sources(&[&frecent, &fd, &indexed]);
         let fd_positions: Vec<usize> = fd
             .iter()
-            .map(|f| merged.iter().position(|m| m == f).expect("fd entry present"))
+            .map(|f| {
+                merged
+                    .iter()
+                    .position(|m| m == f)
+                    .expect("fd entry present")
+            })
             .collect();
         assert!(
             fd_positions.windows(2).all(|w| w[0] < w[1]),
@@ -775,8 +782,10 @@ mod tests {
         let nonexistent = dir.path().join("no").join("such").join("dir");
         // Whatever the store state, this must return rather than panic.
         let got = indexed_dirs_under(&nonexistent, 10);
-        assert!(got.iter().all(|d| d.starts_with(nonexistent.to_string_lossy().as_ref())
-            || !got.is_empty()));
+        assert!(
+            got.iter()
+                .all(|d| d.starts_with(nonexistent.to_string_lossy().as_ref()) || !got.is_empty())
+        );
     }
 
     #[test]

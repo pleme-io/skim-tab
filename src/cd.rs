@@ -10,7 +10,10 @@ use anyhow::Result;
 use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
-use skim_tab::{base_options, build_options, fd_discover, parse_query, run_skim_on_tty, shell_quote, FdTarget, ICON_CD};
+use skim_tab::{
+    FdTarget, ICON_CD, base_options, build_options, fd_discover, parse_query, run_skim_on_tty,
+    shell_quote,
+};
 
 /// Preview command: eza tree.
 fn preview_command() -> String {

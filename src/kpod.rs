@@ -42,9 +42,7 @@ fn main() -> Result<()> {
     let options = build_options(
         base_options("")
             .prompt(ICON_K8S.to_string())
-            .preview(
-                "kubectl describe pod {1} 2>/dev/null | head -40".to_string(),
-            )
+            .preview("kubectl describe pod {1} 2>/dev/null | head -40".to_string())
             .preview_window(PreviewLayout::from("down:6:wrap"))
             .header("Pods | CTRL-/: Toggle Preview | ESC: Cancel".to_string()),
     )?;

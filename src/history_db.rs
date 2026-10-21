@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use thiserror::Error;
 
 /// Errors that can occur in the history subsystem.
@@ -48,11 +48,7 @@ pub trait HistoryStore {
 
     /// Query frecency scores for all words previously selected for the
     /// given command + cwd combination. Returns a map of word to score.
-    fn frecency_scores(
-        &self,
-        command: &str,
-        cwd: &str,
-    ) -> anyhow::Result<HashMap<String, f64>>;
+    fn frecency_scores(&self, command: &str, cwd: &str) -> anyhow::Result<HashMap<String, f64>>;
 }
 
 // ── SQLite-backed store ──────────────────────────────────────────────
@@ -182,11 +178,7 @@ impl HistoryStore for HistoryDb {
         Ok(())
     }
 
-    fn frecency_scores(
-        &self,
-        command: &str,
-        cwd: &str,
-    ) -> anyhow::Result<HashMap<String, f64>> {
+    fn frecency_scores(&self, command: &str, cwd: &str) -> anyhow::Result<HashMap<String, f64>> {
         Ok(self.frecency_scores(command, cwd)?)
     }
 }
@@ -220,11 +212,7 @@ impl HistoryStore for MemHistoryStore {
         Ok(())
     }
 
-    fn frecency_scores(
-        &self,
-        command: &str,
-        cwd: &str,
-    ) -> anyhow::Result<HashMap<String, f64>> {
+    fn frecency_scores(&self, command: &str, cwd: &str) -> anyhow::Result<HashMap<String, f64>> {
         let entries = self.entries.lock().unwrap();
         let now = std::time::Instant::now();
         let mut scores: HashMap<String, f64> = HashMap::new();
@@ -452,13 +440,19 @@ mod tests {
     fn frecency_score_large_age() {
         let score = frecency_score(365.0, 1);
         assert!(score > 0.0);
-        assert!(score < 0.01, "very old entries should have near-zero score: {score}");
+        assert!(
+            score < 0.01,
+            "very old entries should have near-zero score: {score}"
+        );
     }
 
     #[test]
     fn frecency_score_one_day() {
         let score = frecency_score(1.0, 1);
-        assert!((score - 0.5).abs() < f64::EPSILON, "1-day-old score should be 0.5, got {score}");
+        assert!(
+            (score - 0.5).abs() < f64::EPSILON,
+            "1-day-old score should be 0.5, got {score}"
+        );
     }
 
     #[test]

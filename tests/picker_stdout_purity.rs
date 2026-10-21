@@ -132,9 +132,7 @@ fn drive_picker(
             answered += 1;
         }
         // Once the candidate list is painted, perform the interaction.
-        if interacted_at.is_none()
-            && String::from_utf8_lossy(&transcript).contains(wait_for)
-        {
+        if interacted_at.is_none() && String::from_utf8_lossy(&transcript).contains(wait_for) {
             std::thread::sleep(Duration::from_millis(150));
             let key: &[u8] = match interaction {
                 Interaction::Accept => b"\r",
@@ -153,9 +151,7 @@ fn drive_picker(
                 "picker never reached interaction/EOF (interacted: {}, eof: {}); transcript tail: {:?}",
                 interacted_at.is_some(),
                 eof_at.is_some(),
-                String::from_utf8_lossy(
-                    &transcript[transcript.len().saturating_sub(200)..]
-                ),
+                String::from_utf8_lossy(&transcript[transcript.len().saturating_sub(200)..]),
             );
         }
     };

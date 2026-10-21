@@ -6,10 +6,11 @@
 //!      with `--command`, `--query`, `--buffer` as CLI args (for the zsh widget)
 
 use crate::{
-    base_options, config, history_db::HistoryDb, k8s,
+    ANSI_DIM, ANSI_FROST, ANSI_GREEN, ANSI_PURPLE, ANSI_RESET, ANSI_YELLOW, ICON_CD, ICON_POINTER,
+    base_options, config,
+    history_db::HistoryDb,
+    k8s,
     specs::{DescriptionProvider, SpecRegistry},
-    ANSI_DIM, ANSI_FROST, ANSI_GREEN, ANSI_PURPLE, ANSI_RESET, ANSI_YELLOW, ICON_CD,
-    ICON_POINTER,
 };
 use config::CompletionMode;
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -82,7 +83,11 @@ pub struct Candidate {
 
 impl Candidate {
     fn display_text(&self) -> &str {
-        if self.display.is_empty() { &self.word } else { &self.display }
+        if self.display.is_empty() {
+            &self.word
+        } else {
+            &self.display
+        }
     }
 
     /// Build a selection respecting config flags.
@@ -168,20 +173,21 @@ fn parse_compcap(data: &[u8], command: &str, query: &str, buffer: &str) -> Compl
         let parts: Vec<&[u8]> = entry[stx_pos + 1..].split(|&b| b == 0x00).collect();
         let mut map: HashMap<String, String> = HashMap::new();
 
-        let start = if parts.len() >= 2
-            && parts[0] == b"<"
-            && (parts[1] == b">" || parts[1].is_empty())
-        {
-            2
-        } else {
-            0
-        };
+        let start =
+            if parts.len() >= 2 && parts[0] == b"<" && (parts[1] == b">" || parts[1].is_empty()) {
+                2
+            } else {
+                0
+            };
 
         for pair in parts[start..].chunks(2) {
             if pair.len() == 2 {
                 let key = String::from_utf8_lossy(pair[0]);
                 if !key.is_empty() {
-                    map.insert(key.into_owned(), String::from_utf8_lossy(pair[1]).into_owned());
+                    map.insert(
+                        key.into_owned(),
+                        String::from_utf8_lossy(pair[1]).into_owned(),
+                    );
                 }
             }
         }
@@ -276,8 +282,7 @@ fn colorize(
     let enriched = if display.contains(" -- ") {
         None
     } else {
-        build_description(lookup_word, command, k8s, registry)
-            .map(|d| format!("{display} -- {d}"))
+        build_description(lookup_word, command, k8s, registry).map(|d| format!("{display} -- {d}"))
     };
     let text = enriched.as_deref().unwrap_or(display);
 
@@ -288,7 +293,11 @@ fn colorize(
         if !k8s.active_ns.is_empty() && lookup_word == k8s.active_ns {
             return format!("{ANSI_GREEN}{word}{ANSI_RESET} {ANSI_DIM}-- {styled}{ANSI_RESET}");
         }
-        let wc = if word.starts_with('-') { ANSI_YELLOW } else { ANSI_FROST };
+        let wc = if word.starts_with('-') {
+            ANSI_YELLOW
+        } else {
+            ANSI_FROST
+        };
         format!("{wc}{word}{ANSI_RESET} {ANSI_DIM}-- {styled}{ANSI_RESET}")
     } else if text.starts_with('-') {
         format!("{ANSI_YELLOW}{text}{ANSI_RESET}")
@@ -355,7 +364,11 @@ fn color_description(desc: &str) -> String {
 /// Checks the YAML spec registry (built-in + user + project specs).
 /// Results include a glyph prefix (e.g., "◇ Build an image") when available.
 #[must_use]
-fn lookup_description(word: &str, command: &str, registry: &dyn DescriptionProvider) -> Option<String> {
+fn lookup_description(
+    word: &str,
+    command: &str,
+    registry: &dyn DescriptionProvider,
+) -> Option<String> {
     let base = command.split(':').next().unwrap_or(command);
     registry.lookup(base, word).map(|(glyph, desc)| {
         if glyph.is_empty() {
@@ -392,11 +405,18 @@ fn print_response(action: &str, selections: &[Selection], mode: OutputMode, exec
     match mode {
         OutputMode::Json => {
             let resp = CompletionResponse {
-                action: if action == "select" { "select" } else { "abort" },
+                action: if action == "select" {
+                    "select"
+                } else {
+                    "abort"
+                },
                 selections: selections.to_vec(),
                 query: None,
             };
-            println!("{}", serde_json::to_string(&resp).unwrap_or_else(|e| format!("{{\"error\": \"{e}\"}}")));
+            println!(
+                "{}",
+                serde_json::to_string(&resp).unwrap_or_else(|e| format!("{{\"error\": \"{e}\"}}"))
+            );
         }
         OutputMode::Eval => {
             println!("{action}");
@@ -405,8 +425,7 @@ fn print_response(action: &str, selections: &[Selection], mode: OutputMode, exec
                 let exec_flag = if execute { "x" } else { "" };
                 println!(
                     "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
-                    s.word, s.prefix, s.suffix, s.iprefix, s.isuffix, s.args, dir_flag,
-                    exec_flag
+                    s.word, s.prefix, s.suffix, s.iprefix, s.isuffix, s.args, dir_flag, exec_flag
                 );
             }
         }
@@ -474,10 +493,7 @@ fn parse_accept_execute_key(key_spec: &str) -> Option<ParsedKey> {
         && (ch_str.len() == 1 || ch_str.chars().count() == 1)
     {
         let ch = ch_str.chars().next()?;
-        return Some((
-            format!("alt-{ch}"),
-            (KeyCode::Char(ch), KeyModifiers::ALT),
-        ));
+        return Some((format!("alt-{ch}"), (KeyCode::Char(ch), KeyModifiers::ALT)));
     }
 
     // Bare single character
@@ -490,10 +506,7 @@ fn parse_accept_execute_key(key_spec: &str) -> Option<ParsedKey> {
 }
 
 /// Check if a crossterm `KeyEvent` matches a parsed (KeyCode, KeyModifiers) pair.
-fn matches_key(
-    event: &crossterm::event::KeyEvent,
-    expected: &(KeyCode, KeyModifiers),
-) -> bool {
+fn matches_key(event: &crossterm::event::KeyEvent, expected: &(KeyCode, KeyModifiers)) -> bool {
     // Compare code and check that the expected modifiers are present
     // (crossterm may add extra modifiers like SHIFT for uppercase).
     event.code == expected.0 && event.modifiers.contains(expected.1)
@@ -521,7 +534,12 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
 
         // Optional in-picker descent
         if cfg.completion.in_picker_descent && sel.is_dir {
-            let final_sel = crate::descent::run_descent(c, &sel, &req.command, matches!(output_mode, OutputMode::Eval));
+            let final_sel = crate::descent::run_descent(
+                c,
+                &sel,
+                &req.command,
+                matches!(output_mode, OutputMode::Eval),
+            );
             print_response("select", &[final_sel], output_mode, false);
             return;
         }
@@ -558,8 +576,8 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     // (it no longer starts eagerly at login) and briefly polls for the
     // socket; falls back to `static_registry` on any error or timeout,
     // exactly as if no daemon existed at all.
-    let cached_provider: Option<crate::daemon::CachedProvider> =
-        crate::daemon::ensure_socket().and_then(|sock| {
+    let cached_provider: Option<crate::daemon::CachedProvider> = crate::daemon::ensure_socket()
+        .and_then(|sock| {
             let words: Vec<&str> = req.candidates.iter().map(|c| c.word.as_str()).collect();
             crate::daemon::prefetch(&sock, &base_cmd, &words).ok()
         });
@@ -588,7 +606,11 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         || (mode == CompletionMode::Hybrid && service_enrichment.is_none());
 
     // Phase 1: K8s context for header/prompt (pure file read, ~0ms)
-    let kube_ctx = if is_k8s { k8s::KubeContext::current() } else { None };
+    let kube_ctx = if is_k8s {
+        k8s::KubeContext::current()
+    } else {
+        None
+    };
 
     // Phase 2: Resource counts for resource type candidates
     let resource_counts = if use_direct
@@ -630,12 +652,12 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     };
 
     // ── Frecency: open history DB and reorder candidates ────────
-    let history_db = if cfg.completion.enrichment.history_boost || cfg.completion.enrichment.frecency
-    {
-        HistoryDb::open().ok()
-    } else {
-        None
-    };
+    let history_db =
+        if cfg.completion.enrichment.history_boost || cfg.completion.enrichment.frecency {
+            HistoryDb::open().ok()
+        } else {
+            None
+        };
 
     if cfg.completion.enrichment.frecency
         && let Some(ref db) = history_db
@@ -677,7 +699,16 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     let display_lines: Vec<String> = req
         .candidates
         .iter()
-        .map(|c| colorize(c.display_text(), c, &ls_colors, &base_cmd, &enrichment, registry))
+        .map(|c| {
+            colorize(
+                c.display_text(),
+                c,
+                &ls_colors,
+                &base_cmd,
+                &enrichment,
+                registry,
+            )
+        })
         .collect();
 
     // Prompt: context-aware for k8s, icon for others
@@ -686,7 +717,9 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         _ => kube_ctx
             .as_ref()
             .map(|ctx| ctx.prompt())
-            .unwrap_or_else(|| tool_icon(&base_cmd, registry).unwrap_or_else(|| ICON_POINTER.to_string())),
+            .unwrap_or_else(|| {
+                tool_icon(&base_cmd, registry).unwrap_or_else(|| ICON_POINTER.to_string())
+            }),
     };
 
     let mut builder = base_options(&req.query);
@@ -756,10 +789,8 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
     }
 
     // Write preview manifest for the --preview callback
-    let manifest_path = std::env::temp_dir().join(format!(
-        "skim-tab-manifest-{}.json",
-        std::process::id()
-    ));
+    let manifest_path =
+        std::env::temp_dir().join(format!("skim-tab-manifest-{}.json", std::process::id()));
     let manifest = serde_json::json!({
         "command": &req.command,
         "buffer": &req.buffer,
@@ -769,7 +800,10 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
             "realdir": c.realdir,
         })).collect::<Vec<_>>(),
     });
-    let _ = std::fs::write(&manifest_path, serde_json::to_string(&manifest).unwrap_or_else(|e| format!("{{\"error\": \"{e}\"}}")));
+    let _ = std::fs::write(
+        &manifest_path,
+        serde_json::to_string(&manifest).unwrap_or_else(|e| format!("{{\"error\": \"{e}\"}}")),
+    );
 
     builder.preview(format!(
         "skim-tab --preview {} '{{}}'",
@@ -849,9 +883,11 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
 
     if should_descend {
         let sel_word = &selections[0].word;
-        if let Some(sc) = req.candidates.iter().find(|c| {
-            c.word == *sel_word || format!("{}/", c.word) == *sel_word
-        }) {
+        if let Some(sc) = req
+            .candidates
+            .iter()
+            .find(|c| c.word == *sel_word || format!("{}/", c.word) == *sel_word)
+        {
             let final_sel = crate::descent::run_descent(
                 sc,
                 &selections[0],
@@ -863,7 +899,8 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         }
     }
     // ── History: record selections ────────────────────────────────
-    if cfg.completion.enrichment.history_boost && !selections.is_empty()
+    if cfg.completion.enrichment.history_boost
+        && !selections.is_empty()
         && let Some(ref db) = history_db
     {
         let cwd = std::env::current_dir()
@@ -874,7 +911,11 @@ fn run_completion(mut req: CompletionRequest, output_mode: OutputMode) {
         }
     }
 
-    let action = if selections.is_empty() { "abort" } else { "select" };
+    let action = if selections.is_empty() {
+        "abort"
+    } else {
+        "select"
+    };
     print_response(action, &selections, output_mode, was_execute);
 }
 
@@ -1158,7 +1199,14 @@ mod tests {
         let ls = LsColors::default();
         let reg = test_registry();
         let c = Candidate::default();
-        let result = colorize("get -- Display resources", &c, &ls, "kubectl", &K8sEnrichment::default(), &reg);
+        let result = colorize(
+            "get -- Display resources",
+            &c,
+            &ls,
+            "kubectl",
+            &K8sEnrichment::default(),
+            &reg,
+        );
         // Should contain ANSI codes
         assert!(result.contains('\x1b'));
         // Stripped should match original
@@ -1170,7 +1218,14 @@ mod tests {
         let ls = LsColors::default();
         let reg = test_registry();
         let c = Candidate::default();
-        let result = colorize("--namespace", &c, &ls, "kubectl", &K8sEnrichment::default(), &reg);
+        let result = colorize(
+            "--namespace",
+            &c,
+            &ls,
+            "kubectl",
+            &K8sEnrichment::default(),
+            &reg,
+        );
         assert!(result.contains('\x1b'));
         assert_eq!(crate::strip_ansi(&result), "--namespace");
     }
@@ -1180,7 +1235,14 @@ mod tests {
         let ls = LsColors::default();
         let reg = test_registry();
         let c = Candidate::default();
-        let result = colorize("--output -- Output format", &c, &ls, "kubectl", &K8sEnrichment::default(), &reg);
+        let result = colorize(
+            "--output -- Output format",
+            &c,
+            &ls,
+            "kubectl",
+            &K8sEnrichment::default(),
+            &reg,
+        );
         assert!(result.contains(ANSI_YELLOW));
         assert_eq!(crate::strip_ansi(&result), "--output -- Output format");
     }
@@ -1189,7 +1251,11 @@ mod tests {
     fn colorize_enriches_kubectl_subcommand() {
         let ls = LsColors::default();
         let reg = test_registry();
-        let c = Candidate { word: "get".into(), display: "get".into(), ..Default::default() };
+        let c = Candidate {
+            word: "get".into(),
+            display: "get".into(),
+            ..Default::default()
+        };
         let result = colorize("get", &c, &ls, "kubectl", &K8sEnrichment::default(), &reg);
         let stripped = crate::strip_ansi(&result);
         assert!(stripped.contains("get"));
@@ -1214,7 +1280,14 @@ mod tests {
         let ls = LsColors::default();
         let reg = test_registry();
         let c = Candidate::default();
-        let result = colorize("kustomizations", &c, &ls, "flux", &K8sEnrichment::default(), &reg);
+        let result = colorize(
+            "kustomizations",
+            &c,
+            &ls,
+            "flux",
+            &K8sEnrichment::default(),
+            &reg,
+        );
         let stripped = crate::strip_ansi(&result);
         assert!(stripped.contains("Kustomize reconciler"));
     }
@@ -1236,7 +1309,14 @@ mod tests {
         let ls = LsColors::default();
         let reg = test_registry();
         let c = Candidate::default();
-        let result = colorize("my-random-pod", &c, &ls, "kubectl", &K8sEnrichment::default(), &reg);
+        let result = colorize(
+            "my-random-pod",
+            &c,
+            &ls,
+            "kubectl",
+            &K8sEnrichment::default(),
+            &reg,
+        );
         let stripped = crate::strip_ansi(&result);
         assert_eq!(stripped, "my-random-pod");
     }
@@ -1244,23 +1324,38 @@ mod tests {
     #[test]
     fn lookup_description_kubectl() {
         let reg = test_registry();
-        assert_eq!(lookup_description("pods", "kubectl", &reg).as_deref(), Some("\u{25C9} Pod workloads"));
-        assert_eq!(lookup_description("deploy", "k", &reg).as_deref(), Some("\u{25CE} Managed replicas"));
+        assert_eq!(
+            lookup_description("pods", "kubectl", &reg).as_deref(),
+            Some("\u{25C9} Pod workloads")
+        );
+        assert_eq!(
+            lookup_description("deploy", "k", &reg).as_deref(),
+            Some("\u{25CE} Managed replicas")
+        );
         assert_eq!(lookup_description("unknown-thing", "kubectl", &reg), None);
     }
 
     #[test]
     fn lookup_description_helm() {
         let reg = test_registry();
-        assert_eq!(lookup_description("upgrade", "helm", &reg).as_deref(), Some("\u{25C7} Upgrade a release"));
+        assert_eq!(
+            lookup_description("upgrade", "helm", &reg).as_deref(),
+            Some("\u{25C7} Upgrade a release")
+        );
         assert_eq!(lookup_description("nope", "helm", &reg), None);
     }
 
     #[test]
     fn lookup_description_flux() {
         let reg = test_registry();
-        assert_eq!(lookup_description("reconcile", "flux", &reg).as_deref(), Some("\u{21BB} Trigger reconciliation"));
-        assert_eq!(lookup_description("hr", "flux", &reg).as_deref(), Some("\u{2295} Helm release reconciler"));
+        assert_eq!(
+            lookup_description("reconcile", "flux", &reg).as_deref(),
+            Some("\u{21BB} Trigger reconciliation")
+        );
+        assert_eq!(
+            lookup_description("hr", "flux", &reg).as_deref(),
+            Some("\u{2295} Helm release reconciler")
+        );
         assert_eq!(lookup_description("nope", "flux", &reg), None);
     }
 
@@ -1301,14 +1396,26 @@ mod tests {
     #[test]
     fn has_resource_type_candidates_detects() {
         let with_slash = vec![
-            Candidate { display: "pods/".into(), ..Default::default() },
-            Candidate { display: "services/".into(), ..Default::default() },
+            Candidate {
+                display: "pods/".into(),
+                ..Default::default()
+            },
+            Candidate {
+                display: "services/".into(),
+                ..Default::default()
+            },
         ];
         assert!(has_resource_type_candidates(&with_slash));
 
         let without = vec![
-            Candidate { display: "get".into(), ..Default::default() },
-            Candidate { display: "describe".into(), ..Default::default() },
+            Candidate {
+                display: "get".into(),
+                ..Default::default()
+            },
+            Candidate {
+                display: "describe".into(),
+                ..Default::default()
+            },
         ];
         assert!(!has_resource_type_candidates(&without));
     }
@@ -1493,38 +1600,38 @@ mod tests {
 
     #[test]
     fn matches_key_exact() {
-        let event = crossterm::event::KeyEvent::new(
-            KeyCode::Char('/'),
-            KeyModifiers::NONE,
-        );
-        assert!(matches_key(&event, &(KeyCode::Char('/'), KeyModifiers::NONE)));
+        let event = crossterm::event::KeyEvent::new(KeyCode::Char('/'), KeyModifiers::NONE);
+        assert!(matches_key(
+            &event,
+            &(KeyCode::Char('/'), KeyModifiers::NONE)
+        ));
     }
 
     #[test]
     fn matches_key_ctrl() {
-        let event = crossterm::event::KeyEvent::new(
-            KeyCode::Char('x'),
-            KeyModifiers::CONTROL,
-        );
-        assert!(matches_key(&event, &(KeyCode::Char('x'), KeyModifiers::CONTROL)));
+        let event = crossterm::event::KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL);
+        assert!(matches_key(
+            &event,
+            &(KeyCode::Char('x'), KeyModifiers::CONTROL)
+        ));
     }
 
     #[test]
     fn matches_key_wrong_char() {
-        let event = crossterm::event::KeyEvent::new(
-            KeyCode::Char('a'),
-            KeyModifiers::NONE,
-        );
-        assert!(!matches_key(&event, &(KeyCode::Char('/'), KeyModifiers::NONE)));
+        let event = crossterm::event::KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE);
+        assert!(!matches_key(
+            &event,
+            &(KeyCode::Char('/'), KeyModifiers::NONE)
+        ));
     }
 
     #[test]
     fn matches_key_wrong_modifier() {
-        let event = crossterm::event::KeyEvent::new(
-            KeyCode::Char('x'),
-            KeyModifiers::NONE,
-        );
-        assert!(!matches_key(&event, &(KeyCode::Char('x'), KeyModifiers::CONTROL)));
+        let event = crossterm::event::KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE);
+        assert!(!matches_key(
+            &event,
+            &(KeyCode::Char('x'), KeyModifiers::CONTROL)
+        ));
     }
 
     #[test]
@@ -1535,7 +1642,10 @@ mod tests {
             KeyCode::Char('x'),
             KeyModifiers::CONTROL | KeyModifiers::SHIFT,
         );
-        assert!(matches_key(&event, &(KeyCode::Char('x'), KeyModifiers::CONTROL)));
+        assert!(matches_key(
+            &event,
+            &(KeyCode::Char('x'), KeyModifiers::CONTROL)
+        ));
     }
 
     // ── Midword completion tests ────────────────────────────────────
@@ -1612,20 +1722,25 @@ mod tests {
         let exec_flag = "";
         let line = format!(
             "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
-            sel.word, sel.prefix, sel.suffix,
-            sel.iprefix, sel.isuffix, sel.args,
-            dir_flag, exec_flag
+            sel.word,
+            sel.prefix,
+            sel.suffix,
+            sel.iprefix,
+            sel.isuffix,
+            sel.args,
+            dir_flag,
+            exec_flag
         );
         let fields: Vec<&str> = line.split('\x1f').collect();
         assert_eq!(fields.len(), 8, "eval response must have exactly 8 fields");
         assert_eq!(fields[0], "commit");
-        assert_eq!(fields[1], "com");   // PREFIX
-        assert_eq!(fields[2], "mit");   // SUFFIX — critical for midword
-        assert_eq!(fields[3], "");      // IPREFIX
-        assert_eq!(fields[4], "");      // ISUFFIX
-        assert_eq!(fields[5], "-Q");    // args
-        assert_eq!(fields[6], "");      // dir_flag
-        assert_eq!(fields[7], "");      // exec_flag
+        assert_eq!(fields[1], "com"); // PREFIX
+        assert_eq!(fields[2], "mit"); // SUFFIX — critical for midword
+        assert_eq!(fields[3], ""); // IPREFIX
+        assert_eq!(fields[4], ""); // ISUFFIX
+        assert_eq!(fields[5], "-Q"); // args
+        assert_eq!(fields[6], ""); // dir_flag
+        assert_eq!(fields[7], ""); // exec_flag
     }
 
     #[test]
@@ -1642,8 +1757,7 @@ mod tests {
         let dir_flag = if sel.is_dir { "d" } else { "" };
         let line = format!(
             "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f",
-            sel.word, sel.prefix, sel.suffix,
-            sel.iprefix, sel.isuffix, sel.args, dir_flag
+            sel.word, sel.prefix, sel.suffix, sel.iprefix, sel.isuffix, sel.args, dir_flag
         );
         let fields: Vec<&str> = line.split('\x1f').collect();
         assert_eq!(fields[6], "d");
@@ -1653,7 +1767,8 @@ mod tests {
     #[test]
     fn parse_compcap_roundtrip_midword() {
         // Full roundtrip: parse compcap → candidate → selection → eval format
-        let entry = b"screenshot\x02<\x00>\x00PREFIX\x00scr\x00SUFFIX\x00ipt.sh\x00word\x00screenshot";
+        let entry =
+            b"screenshot\x02<\x00>\x00PREFIX\x00scr\x00SUFFIX\x00ipt.sh\x00word\x00screenshot";
         let req = parse_compcap(entry, "vim", "^scr", "vim scr");
         let c = &req.candidates[0];
         assert_eq!(c.prefix, "scr");
@@ -1667,13 +1782,12 @@ mod tests {
         let dir_flag = if sel.is_dir { "d" } else { "" };
         let line = format!(
             "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f",
-            sel.word, sel.prefix, sel.suffix,
-            sel.iprefix, sel.isuffix, sel.args, dir_flag
+            sel.word, sel.prefix, sel.suffix, sel.iprefix, sel.isuffix, sel.args, dir_flag
         );
         let fields: Vec<&str> = line.split('\x1f').collect();
         assert_eq!(fields[0], "screenshot"); // word
-        assert_eq!(fields[1], "scr");        // prefix
-        assert_eq!(fields[2], "ipt.sh");     // suffix preserved through pipeline
+        assert_eq!(fields[1], "scr"); // prefix
+        assert_eq!(fields[2], "ipt.sh"); // suffix preserved through pipeline
     }
 
     #[test]
@@ -1720,14 +1834,15 @@ mod tests {
         let req = parse_compcap(entry, "git", "", "git ");
         let c = &req.candidates[0];
         assert_eq!(c.word, "commit");
-        assert_eq!(c.prefix, "");      // empty — cursor at start
+        assert_eq!(c.prefix, ""); // empty — cursor at start
         assert_eq!(c.suffix, "commit"); // entire word is suffix
     }
 
     #[test]
     fn parse_compcap_hyphenated_midword() {
         // "kubectl --name|space" → PREFIX="--name", SUFFIX="space"
-        let entry = b"--namespace\x02<\x00>\x00PREFIX\x00--name\x00SUFFIX\x00space\x00word\x00--namespace";
+        let entry =
+            b"--namespace\x02<\x00>\x00PREFIX\x00--name\x00SUFFIX\x00space\x00word\x00--namespace";
         let req = parse_compcap(entry, "kubectl", "^--name", "kubectl --name");
         let c = &req.candidates[0];
         assert_eq!(c.word, "--namespace");
@@ -1738,7 +1853,8 @@ mod tests {
     #[test]
     fn parse_compcap_path_midword() {
         // "cd ~/co|de/github" → PREFIX="co", SUFFIX="de", IPREFIX="~/"
-        let entry = b"code\x02<\x00>\x00PREFIX\x00co\x00SUFFIX\x00de\x00IPREFIX\x00~/\x00word\x00code";
+        let entry =
+            b"code\x02<\x00>\x00PREFIX\x00co\x00SUFFIX\x00de\x00IPREFIX\x00~/\x00word\x00code";
         let req = parse_compcap(entry, "cd", "^co", "cd ~/co");
         let c = &req.candidates[0];
         assert_eq!(c.prefix, "co");
@@ -1775,12 +1891,11 @@ mod tests {
         };
         let line = format!(
             "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
-            sel.word, sel.prefix, sel.suffix,
-            sel.iprefix, sel.isuffix, sel.args, "", ""
+            sel.word, sel.prefix, sel.suffix, sel.iprefix, sel.isuffix, sel.args, "", ""
         );
         let fields: Vec<&str> = line.split('\x1f').collect();
         assert_eq!(fields[0], "commit");
-        assert_eq!(fields[1], "");       // PREFIX empty
+        assert_eq!(fields[1], ""); // PREFIX empty
         assert_eq!(fields[2], "commit"); // SUFFIX is the full word
     }
 
@@ -1808,8 +1923,12 @@ mod tests {
 
         let line = format!(
             "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f",
-            sel.word, sel.prefix, sel.suffix,
-            sel.iprefix, sel.isuffix, sel.args,
+            sel.word,
+            sel.prefix,
+            sel.suffix,
+            sel.iprefix,
+            sel.isuffix,
+            sel.args,
             if sel.is_dir { "d" } else { "" }
         );
         let fields: Vec<&str> = line.split('\x1f').collect();
@@ -1883,7 +2002,10 @@ mod tests {
         };
         let cfg = config::CompletionConfig::default();
         let sel = c.to_selection_with_config(&cfg);
-        assert!(!sel.is_dir, "non-file candidate should never be detected as dir");
+        assert!(
+            !sel.is_dir,
+            "non-file candidate should never be detected as dir"
+        );
     }
 
     #[test]
@@ -1933,7 +2055,14 @@ mod tests {
         let ls = LsColors::default();
         let reg = test_registry();
         let c = Candidate::default();
-        let result = colorize("some-random-thing", &c, &ls, "unknown-cmd", &K8sEnrichment::default(), &reg);
+        let result = colorize(
+            "some-random-thing",
+            &c,
+            &ls,
+            "unknown-cmd",
+            &K8sEnrichment::default(),
+            &reg,
+        );
         assert!(result.contains(ANSI_FROST));
         assert_eq!(crate::strip_ansi(&result), "some-random-thing");
     }
@@ -2141,12 +2270,15 @@ mod tests {
 
     #[test]
     fn matches_key_alt() {
-        let event = crossterm::event::KeyEvent::new(
-            KeyCode::Char('a'),
-            KeyModifiers::ALT,
-        );
-        assert!(matches_key(&event, &(KeyCode::Char('a'), KeyModifiers::ALT)));
-        assert!(!matches_key(&event, &(KeyCode::Char('a'), KeyModifiers::CONTROL)));
+        let event = crossterm::event::KeyEvent::new(KeyCode::Char('a'), KeyModifiers::ALT);
+        assert!(matches_key(
+            &event,
+            &(KeyCode::Char('a'), KeyModifiers::ALT)
+        ));
+        assert!(!matches_key(
+            &event,
+            &(KeyCode::Char('a'), KeyModifiers::CONTROL)
+        ));
     }
 
     // ── lookup_description edge cases ────────────────────────────────
@@ -2353,7 +2485,14 @@ mod tests {
         let ls = LsColors::default();
         let reg = test_registry();
         let c = Candidate::default();
-        let result = colorize("plan", &c, &ls, "terraform", &K8sEnrichment::default(), &reg);
+        let result = colorize(
+            "plan",
+            &c,
+            &ls,
+            "terraform",
+            &K8sEnrichment::default(),
+            &reg,
+        );
         let stripped = crate::strip_ansi(&result);
         assert!(stripped.contains("Show execution plan"));
     }
@@ -2385,10 +2524,21 @@ mod tests {
         let ls = LsColors::default();
         let reg = test_registry();
         let c = Candidate::default();
-        let result = colorize("get -- Display resources", &c, &ls, "kubectl", &K8sEnrichment::default(), &reg);
+        let result = colorize(
+            "get -- Display resources",
+            &c,
+            &ls,
+            "kubectl",
+            &K8sEnrichment::default(),
+            &reg,
+        );
         let stripped = crate::strip_ansi(&result);
         assert_eq!(stripped, "get -- Display resources");
-        assert_eq!(stripped.matches(" -- ").count(), 1, "should not double-add description");
+        assert_eq!(
+            stripped.matches(" -- ").count(),
+            1,
+            "should not double-add description"
+        );
     }
 
     // ── colorize with podman alias ────────────────────────────────────
@@ -2477,7 +2627,10 @@ mod tests {
 
     #[test]
     fn completion_base_cmd_pipe_buffer() {
-        assert_eq!(completion_base_cmd("", "kubectl get pods | grep"), "kubectl");
+        assert_eq!(
+            completion_base_cmd("", "kubectl get pods | grep"),
+            "kubectl"
+        );
     }
 
     // ── Eval output format validation ─────────────────────────────────
@@ -2497,9 +2650,14 @@ mod tests {
         let exec_flag = "x";
         let line = format!(
             "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
-            sel.word, sel.prefix, sel.suffix,
-            sel.iprefix, sel.isuffix, sel.args,
-            dir_flag, exec_flag
+            sel.word,
+            sel.prefix,
+            sel.suffix,
+            sel.iprefix,
+            sel.isuffix,
+            sel.args,
+            dir_flag,
+            exec_flag
         );
         let fields: Vec<&str> = line.split('\x1f').collect();
         assert_eq!(fields.len(), 8);
@@ -2521,9 +2679,14 @@ mod tests {
         let exec_flag = "x";
         let line = format!(
             "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}",
-            sel.word, sel.prefix, sel.suffix,
-            sel.iprefix, sel.isuffix, sel.args,
-            dir_flag, exec_flag
+            sel.word,
+            sel.prefix,
+            sel.suffix,
+            sel.iprefix,
+            sel.isuffix,
+            sel.args,
+            dir_flag,
+            exec_flag
         );
         let fields: Vec<&str> = line.split('\x1f').collect();
         assert_eq!(fields[6], "d");

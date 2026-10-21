@@ -9,7 +9,7 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
-use skim_tab::{base_options, build_options, run_skim_on_tty, ICON_MARKER, ICON_SEARCH};
+use skim_tab::{ICON_MARKER, ICON_SEARCH, base_options, build_options, run_skim_on_tty};
 
 /// List processes via ps.
 fn process_list() -> Result<String> {

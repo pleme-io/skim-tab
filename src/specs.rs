@@ -178,10 +178,9 @@ impl DescriptionProvider for SpecRegistry {
     /// Returns `true` if the command matches any spec that uses the
     /// K8s icon ("\u{2388} ").
     fn is_k8s_command(&self, cmd: &str) -> bool {
-        self.specs.iter().any(|s| {
-            s.commands.iter().any(|c| c == cmd)
-                && s.icon.as_deref() == Some("\u{2388} ")
-        })
+        self.specs
+            .iter()
+            .any(|s| s.commands.iter().any(|c| c == cmd) && s.icon.as_deref() == Some("\u{2388} "))
     }
 }
 
@@ -241,10 +240,7 @@ pub fn load_specs_from_dir(path: &Path) -> Vec<CompletionSpec> {
 
     for entry in entries.flatten() {
         let file_path = entry.path();
-        let ext = file_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         if ext != "yaml" && ext != "yml" {
             continue;
@@ -261,10 +257,7 @@ pub fn load_specs_from_dir(path: &Path) -> Vec<CompletionSpec> {
                 }
             },
             Err(e) => {
-                eprintln!(
-                    "skim-tab: failed to read spec {}: {e}",
-                    file_path.display()
-                );
+                eprintln!("skim-tab: failed to read spec {}: {e}", file_path.display());
             }
         }
     }
@@ -536,8 +529,7 @@ mod tests {
             ("test-cmd".to_string(), "sub".to_string()),
             ("G".to_string(), "A description".to_string()),
         );
-        mock.icons
-            .insert("test-cmd".to_string(), "T ".to_string());
+        mock.icons.insert("test-cmd".to_string(), "T ".to_string());
 
         let result = DescriptionProvider::lookup(&mock, "test-cmd", "sub");
         assert_eq!(result, Some(("G", "A description")));
@@ -556,12 +548,15 @@ mod tests {
             icon: Some("A ".to_string()),
             subcommands: {
                 let mut m = HashMap::new();
-                m.insert("sub1".to_string(), SubcommandSpec {
-                    description: "original".to_string(),
-                    glyph: "".to_string(),
-                    subcommands: HashMap::new(),
-                    flags: HashMap::new(),
-                });
+                m.insert(
+                    "sub1".to_string(),
+                    SubcommandSpec {
+                        description: "original".to_string(),
+                        glyph: "".to_string(),
+                        subcommands: HashMap::new(),
+                        flags: HashMap::new(),
+                    },
+                );
                 m
             },
             flags: HashMap::new(),
@@ -571,17 +566,22 @@ mod tests {
             icon: Some("B ".to_string()),
             subcommands: {
                 let mut m = HashMap::new();
-                m.insert("sub1".to_string(), SubcommandSpec {
-                    description: "overridden".to_string(),
-                    glyph: "".to_string(),
-                    subcommands: HashMap::new(),
-                    flags: HashMap::new(),
-                });
+                m.insert(
+                    "sub1".to_string(),
+                    SubcommandSpec {
+                        description: "overridden".to_string(),
+                        glyph: "".to_string(),
+                        subcommands: HashMap::new(),
+                        flags: HashMap::new(),
+                    },
+                );
                 m
             },
             flags: HashMap::new(),
         };
-        let reg = SpecRegistry { specs: vec![spec1, spec2] };
+        let reg = SpecRegistry {
+            specs: vec![spec1, spec2],
+        };
         let (_, desc) = reg.lookup("test-cmd", "sub1").unwrap();
         assert_eq!(desc, "overridden");
         assert_eq!(reg.icon("test-cmd"), Some("B "));
@@ -943,8 +943,10 @@ subcommands:
     #[test]
     fn load_specs_from_dir_multiple_files() {
         let dir = tempfile::tempdir().unwrap();
-        let yaml1 = "commands: [tool1]\nsubcommands:\n  sub1:\n    description: desc1\n    glyph: \">\"\n";
-        let yaml2 = "commands: [tool2]\nsubcommands:\n  sub2:\n    description: desc2\n    glyph: \"<\"\n";
+        let yaml1 =
+            "commands: [tool1]\nsubcommands:\n  sub1:\n    description: desc1\n    glyph: \">\"\n";
+        let yaml2 =
+            "commands: [tool2]\nsubcommands:\n  sub2:\n    description: desc2\n    glyph: \"<\"\n";
         std::fs::write(dir.path().join("a.yaml"), yaml1).unwrap();
         std::fs::write(dir.path().join("b.yml"), yaml2).unwrap();
         let specs = load_specs_from_dir(dir.path());

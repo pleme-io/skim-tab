@@ -117,7 +117,11 @@ mod tests {
         let entries = accumulate(["ls", "cd /tmp", "ls", "ls"]);
         let ls = entries.iter().find(|e| e.command == "ls").unwrap();
         assert_eq!(ls.occurrences, 3, "three runs must count as three");
-        assert_eq!(entries.len(), 2, "still deduplicated into distinct commands");
+        assert_eq!(
+            entries.len(),
+            2,
+            "still deduplicated into distinct commands"
+        );
     }
 
     #[test]
@@ -167,9 +171,12 @@ mod tests {
     fn frequency_accumulates_into_the_score() {
         let now = 1_000_000_000i64;
         let once = accumulate([": 999913600:0;cmd"])[0].frecency(now);
-        let thrice =
-            accumulate([": 999913600:0;cmd", ": 999913600:0;cmd", ": 999913600:0;cmd"])[0]
-                .frecency(now);
+        let thrice = accumulate([
+            ": 999913600:0;cmd",
+            ": 999913600:0;cmd",
+            ": 999913600:0;cmd",
+        ])[0]
+            .frecency(now);
         assert!(
             thrice > once * 2.0,
             "three occurrences must score far above one: {thrice} vs {once}"
@@ -222,9 +229,7 @@ mod tests {
     fn most_recent_is_pinned_above_a_far_more_frequent_command() {
         let now = 2_000_000_000i64;
         let old = now - 86_400;
-        let mut lines: Vec<String> = (0..40)
-            .map(|_| format!(": {old}:0;git status"))
-            .collect();
+        let mut lines: Vec<String> = (0..40).map(|_| format!(": {old}:0;git status")).collect();
         lines.push(format!(": {now}:0;cargo test -p the-crate-im-editing"));
         let refs: Vec<&str> = lines.iter().map(String::as_str).collect();
 

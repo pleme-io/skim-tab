@@ -11,7 +11,9 @@ use std::process::{Command, Stdio};
 use anyhow::{Context, Result};
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
-use skim_tab::{base_options, build_options, editor, parse_query, run_skim_on_tty, shell_quote, ICON_SEARCH};
+use skim_tab::{
+    ICON_SEARCH, base_options, build_options, editor, parse_query, run_skim_on_tty, shell_quote,
+};
 
 /// Upper bound on the match lines this picker loads.
 ///
@@ -182,8 +184,7 @@ fn main() -> Result<()> {
         "Filter matches (fixed at launch) | CTRL-/: Toggle Preview | ESC: Cancel".to_string()
     };
 
-    let colon_delim = regex::Regex::new(":")
-        .context("failed to compile delimiter regex")?;
+    let colon_delim = regex::Regex::new(":").context("failed to compile delimiter regex")?;
     let options = build_options(
         base_options(query)
             .delimiter(colon_delim)

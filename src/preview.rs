@@ -17,10 +17,26 @@ use std::process::Command;
 
 /// Flags that consume the next word as a value (shared by kubectl/flux/helm).
 const FLAGS_WITH_VALUE: &[&str] = &[
-    "-n", "--namespace", "-o", "--output", "-l", "--selector",
-    "-f", "--filename", "--context", "--kubeconfig", "-c", "--container",
-    "--type", "--sort-by", "--field-selector", "--server", "--token",
-    "--certificate-authority", "--cluster", "--user",
+    "-n",
+    "--namespace",
+    "-o",
+    "--output",
+    "-l",
+    "--selector",
+    "-f",
+    "--filename",
+    "--context",
+    "--kubeconfig",
+    "-c",
+    "--container",
+    "--type",
+    "--sort-by",
+    "--field-selector",
+    "--server",
+    "--token",
+    "--certificate-authority",
+    "--cluster",
+    "--user",
 ];
 
 /// Parsed command line buffer — extracts base command, positional
@@ -53,7 +69,11 @@ impl<'a> BufferContext<'a> {
         }
 
         let namespace = find_flag(&words, &["-n", "--namespace"]);
-        Self { base_cmd, subcmds, namespace }
+        Self {
+            base_cmd,
+            subcmds,
+            namespace,
+        }
     }
 
     fn sub(&self, idx: usize) -> &str {
@@ -89,7 +109,11 @@ enum PreviewType {
     File(String),
     GitBranch(String),
     GitFile(String),
-    K8sResource { _tool: String, _ctx: String, _word: String },
+    K8sResource {
+        _tool: String,
+        _ctx: String,
+        _word: String,
+    },
     Process(String),
     Generic(String),
 }
@@ -99,7 +123,10 @@ fn detect_preview_type(command: &str, buffer: &str, word: &str, realdir: &str) -
     let ctx = BufferContext::parse(buffer, command);
 
     // K8s tools get their own dispatch (handled separately in preview())
-    if matches!(ctx.base_cmd, "kubectl" | "kubecolor" | "k" | "flux" | "helm") {
+    if matches!(
+        ctx.base_cmd,
+        "kubectl" | "kubecolor" | "k" | "flux" | "helm"
+    ) {
         return PreviewType::K8sResource {
             _tool: ctx.base_cmd.to_string(),
             _ctx: buffer.to_string(),
@@ -220,10 +247,16 @@ pub fn preview(word: &str, command: &str, buffer: &str, realdir: &str) -> String
 
 /// List resources via `kubectl get`, formatted with count and sample.
 fn kubectl_resource_listing(resource_type: &str, ns: &[&str]) -> String {
-    let out = run("kubectl", &with_ns(&["get", resource_type, "--no-headers"], ns));
+    let out = run(
+        "kubectl",
+        &with_ns(&["get", resource_type, "--no-headers"], ns),
+    );
     let count = out.lines().count();
     let sample: String = out.lines().take(25).collect::<Vec<_>>().join("\n");
-    format!("  {} resources: {count}\n\n{sample}", resource_type.to_uppercase())
+    format!(
+        "  {} resources: {count}\n\n{sample}",
+        resource_type.to_uppercase()
+    )
 }
 
 /// Preview a resource type candidate (trailing `/` already stripped).
@@ -249,23 +282,33 @@ fn preview_kubectl(ctx: &BufferContext, candidate: &str) -> String {
             truncated("kubectl", &with_ns(&["describe", sub1, candidate], &ns), 60)
         }
         "get" | "describe" | "edit" | "delete" => kubectl_resource_listing(candidate, &ns),
-        "logs" => {
-            run("kubectl", &with_ns(&["logs", "--tail=30", "--timestamps", candidate], &ns))
-        }
+        "logs" => run(
+            "kubectl",
+            &with_ns(&["logs", "--tail=30", "--timestamps", candidate], &ns),
+        ),
         "exec" | "attach" | "port-forward" | "cp" => {
-            let wide = run("kubectl", &with_ns(&["get", "pod", candidate, "-o", "wide"], &ns));
-            let desc = truncated("kubectl", &with_ns(&["describe", "pod", candidate], &ns), 40);
+            let wide = run(
+                "kubectl",
+                &with_ns(&["get", "pod", candidate, "-o", "wide"], &ns),
+            );
+            let desc = truncated(
+                "kubectl",
+                &with_ns(&["describe", "pod", candidate], &ns),
+                40,
+            );
             format!("{wide}\n{desc}")
         }
         "top" if sub1 == "pod" || sub1.is_empty() => {
             run("kubectl", &with_ns(&["top", "pod", candidate], &ns))
         }
-        "rollout" => {
-            run("kubectl", &with_ns(&["rollout", "status", sub1, candidate], &ns))
-        }
-        "scale" if !sub1.is_empty() => {
-            run("kubectl", &with_ns(&["get", sub1, candidate, "-o", "wide"], &ns))
-        }
+        "rollout" => run(
+            "kubectl",
+            &with_ns(&["rollout", "status", sub1, candidate], &ns),
+        ),
+        "scale" if !sub1.is_empty() => run(
+            "kubectl",
+            &with_ns(&["get", sub1, candidate, "-o", "wide"], &ns),
+        ),
         "apply" | "create" => try_path_then_command(candidate, candidate, DEFAULT_MAX_LINES),
         "" if candidate.starts_with('-') => preview_command("kubectl"),
         "" => preview_subcommand("kubectl", candidate),
@@ -280,12 +323,8 @@ fn preview_flux(ctx: &BufferContext, candidate: &str) -> String {
     let (sub0, sub1) = (ctx.sub(0), ctx.sub(1));
 
     match sub0 {
-        "get" if !sub1.is_empty() => {
-            run("flux", &with_ns(&["get", sub1, candidate], &ns))
-        }
-        "get" | "reconcile" if sub1.is_empty() => {
-            run("flux", &with_ns(&["get", candidate], &ns))
-        }
+        "get" if !sub1.is_empty() => run("flux", &with_ns(&["get", sub1, candidate], &ns)),
+        "get" | "reconcile" if sub1.is_empty() => run("flux", &with_ns(&["get", candidate], &ns)),
         "reconcile" => {
             let status = run("flux", &with_ns(&["get", sub1, candidate], &ns));
             format!("Current status (before reconcile):\n\n{status}")
@@ -311,15 +350,11 @@ fn preview_helm(ctx: &BufferContext, candidate: &str) -> String {
         "status" | "uninstall" | "rollback" | "history" => {
             run("helm", &with_ns(&[sub0, candidate], &ns))
         }
-        "upgrade" | "list" => {
-            run("helm", &with_ns(&["status", candidate], &ns))
-        }
+        "upgrade" | "list" => run("helm", &with_ns(&["status", candidate], &ns)),
         "install" | "template" if !sub1.is_empty() => {
             truncated("helm", &["show", "chart", candidate], 50)
         }
-        "show" if !sub1.is_empty() => {
-            truncated("helm", &["show", sub1, candidate], 60)
-        }
+        "show" if !sub1.is_empty() => truncated("helm", &["show", sub1, candidate], 60),
         "repo" => run("helm", &["repo", "list"]),
         "" if candidate.starts_with('-') => preview_command("helm"),
         "" => preview_subcommand("helm", candidate),
@@ -368,7 +403,11 @@ fn preview_default(path: &str, word: &str, command: &str, max_lines: usize) -> S
         return preview_command(command);
     }
     let result = preview_command(word);
-    if result.is_empty() { preview_command(command) } else { result }
+    if result.is_empty() {
+        preview_command(command)
+    } else {
+        result
+    }
 }
 
 // ── R3a: Enhanced directory preview ─────────────────────────────────
@@ -378,25 +417,27 @@ fn preview_default(path: &str, word: &str, command: &str, max_lines: usize) -> S
 /// Prefers `eza -la --icons --color=always --no-user --no-time` for rich
 /// output; falls back to `ls -la` if eza is not available.
 fn preview_dir(path: &str, max_lines: usize) -> String {
-    let entry_count = std::fs::read_dir(path)
-        .map(|rd| rd.count())
-        .unwrap_or(0);
+    let entry_count = std::fs::read_dir(path).map(|rd| rd.count()).unwrap_or(0);
 
     let header = format!("  \x1b[1;36m{}\x1b[0m  ({} entries)\n\n", path, entry_count);
 
     let body = if has_tool("eza") {
-        run("eza", &[
-            "-la", "--icons", "--color=always", "--no-user", "--no-time", path,
-        ])
+        run(
+            "eza",
+            &[
+                "-la",
+                "--icons",
+                "--color=always",
+                "--no-user",
+                "--no-time",
+                path,
+            ],
+        )
     } else {
         run("ls", &["-la", path])
     };
 
-    let limited: String = body
-        .lines()
-        .take(max_lines)
-        .collect::<Vec<_>>()
-        .join("\n");
+    let limited: String = body.lines().take(max_lines).collect::<Vec<_>>().join("\n");
 
     format!("{header}{limited}")
 }
@@ -405,13 +446,10 @@ fn preview_dir(path: &str, max_lines: usize) -> String {
 
 /// Known binary file extensions that should not be previewed as text.
 const BINARY_EXTENSIONS: &[&str] = &[
-    "png", "jpg", "jpeg", "gif", "bmp", "ico", "webp", "tiff", "tif", "svg",
-    "mp3", "mp4", "mkv", "avi", "mov", "flac", "wav", "ogg", "opus", "aac",
-    "zip", "tar", "gz", "bz2", "xz", "zst", "7z", "rar",
-    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-    "exe", "dll", "so", "dylib", "a", "o", "obj",
-    "wasm", "class", "pyc", "pyo",
-    "sqlite", "db", "sqlite3",
+    "png", "jpg", "jpeg", "gif", "bmp", "ico", "webp", "tiff", "tif", "svg", "mp3", "mp4", "mkv",
+    "avi", "mov", "flac", "wav", "ogg", "opus", "aac", "zip", "tar", "gz", "bz2", "xz", "zst",
+    "7z", "rar", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "exe", "dll", "so", "dylib",
+    "a", "o", "obj", "wasm", "class", "pyc", "pyo", "sqlite", "db", "sqlite3",
 ];
 
 /// Image extensions for dimension info.
@@ -486,12 +524,15 @@ fn preview_text_file(path: &str, max_lines: usize) -> String {
     let range = format!(":{max_lines}");
 
     if has_tool("bat") {
-        let output = run("bat", &[
-            "--color=always",
-            "--style=numbers,changes",
-            &format!("--line-range={range}"),
-            path,
-        ]);
+        let output = run(
+            "bat",
+            &[
+                "--color=always",
+                "--style=numbers,changes",
+                &format!("--line-range={range}"),
+                path,
+            ],
+        );
         if !output.is_empty() {
             return output;
         }
@@ -536,9 +577,10 @@ fn preview_image_file(path: &str) -> String {
 
 /// Preview a git branch: show recent commit log.
 fn preview_git_branch(name: &str) -> String {
-    let output = run("git", &[
-        "log", "--oneline", "--color=always", "--graph", "-10", name,
-    ]);
+    let output = run(
+        "git",
+        &["log", "--oneline", "--color=always", "--graph", "-10", name],
+    );
     if output.is_empty() {
         return format!("  Branch: {name}\n  (no commits or not found)");
     }
@@ -565,13 +607,17 @@ fn preview_git_diff(file: &str, max_lines: usize) -> String {
 }
 
 fn preview_proc(word: &str) -> String {
-    run("ps", &["-p", word, "-o", "pid,ppid,%cpu,%mem,start,command"])
+    run(
+        "ps",
+        &["-p", word, "-o", "pid,ppid,%cpu,%mem,start,command"],
+    )
 }
 
 /// Preview a command using tldr with fallback to --help.
 fn preview_command(cmd: &str) -> String {
     if let Ok(out) = Command::new("tldr").args(["--color=always", cmd]).output()
-        && out.status.success() && !out.stdout.is_empty()
+        && out.status.success()
+        && !out.stdout.is_empty()
     {
         return String::from_utf8_lossy(&out.stdout).into_owned();
     }
@@ -620,7 +666,11 @@ fn run(cmd: &str, args: &[&str]) -> String {
 
 fn truncated(cmd: &str, args: &[&str], max_lines: usize) -> String {
     let output = run(cmd, args);
-    output.lines().take(max_lines).collect::<Vec<_>>().join("\n")
+    output
+        .lines()
+        .take(max_lines)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn with_ns<'a>(args: &[&'a str], ns: &[&'a str]) -> Vec<&'a str> {

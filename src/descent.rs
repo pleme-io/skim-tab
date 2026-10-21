@@ -10,7 +10,7 @@
 //! When disabled (default), directories are returned to zsh with a
 //! trailing `/` and the user tabs again for the next level.
 
-use crate::{base_options, expand_tilde, ICON_CD};
+use crate::{ICON_CD, base_options, expand_tilde};
 use lscolors::LsColors;
 use skim::prelude::*;
 use std::io;

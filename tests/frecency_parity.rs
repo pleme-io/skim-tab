@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use chrono::{Duration, NaiveDate, NaiveDateTime};
 use proptest::prelude::*;
 use skim_tab::history_db::frecency_score;
-use wadachi_spec::{apply, DirEntry, FrecencyRankingSpec, MockEnvironment, RankPhase};
+use wadachi_spec::{DirEntry, FrecencyRankingSpec, MockEnvironment, RankPhase, apply};
 
 /// 3650 days in seconds — the upper bound on a visit's age.
 const MAX_AGE_SECS: i64 = 3650 * 86_400;
@@ -168,7 +168,10 @@ fn parity_at_zero_age() {
     let ages = vec![0_i64; 3];
     let ranked = apply(&spec, vec![spec_entry(0, &ages, now)], &env).unwrap();
     let skim = skim_tab_score(&ages);
-    assert!((skim - 3.0).abs() < 1e-9, "3 visits at age 0 sum to 3.0: {skim}");
+    assert!(
+        (skim - 3.0).abs() < 1e-9,
+        "3 visits at age 0 sum to 3.0: {skim}"
+    );
     assert!((ranked[0].score - skim).abs() < 1e-9);
 }
 
@@ -182,7 +185,10 @@ fn parity_at_max_age() {
     let ranked = apply(&spec, vec![spec_entry(0, &ages, now)], &env).unwrap();
     let skim = skim_tab_score(&ages);
     assert!((ranked[0].score - skim).abs() < 1e-9);
-    assert!(skim > 0.0 && skim < 0.001, "10-year-old visit is near zero: {skim}");
+    assert!(
+        skim > 0.0 && skim < 0.001,
+        "10-year-old visit is near zero: {skim}"
+    );
 }
 
 /// Exact ties (identical histories) keep insertion order on both sides.

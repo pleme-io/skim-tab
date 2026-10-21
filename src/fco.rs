@@ -26,10 +26,7 @@ fn git_branches() -> Result<String> {
     }
 
     let raw = String::from_utf8_lossy(&output.stdout);
-    let filtered: Vec<&str> = raw
-        .lines()
-        .filter(|l| !l.contains("HEAD"))
-        .collect();
+    let filtered: Vec<&str> = raw.lines().filter(|l| !l.contains("HEAD")).collect();
 
     Ok(filtered.join("\n"))
 }

@@ -10,7 +10,9 @@ use anyhow::{Context, Result};
 use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
-use skim_tab::{base_options, build_options, editor, fd_discover, run_skim_on_tty, FdTarget, ICON_FILES};
+use skim_tab::{
+    FdTarget, ICON_FILES, base_options, build_options, editor, fd_discover, run_skim_on_tty,
+};
 
 fn main() -> Result<()> {
     let entries = fd_discover(FdTarget::Files)?;

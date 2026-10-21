@@ -701,7 +701,8 @@ contexts:
   - name: actual
     context:
       cluster: cluster1
-"#.to_string(),
+"#
+            .to_string(),
         };
         assert!(KubeContext::with_loader(&loader).is_none());
     }
@@ -714,7 +715,8 @@ apiVersion: v1
 kind: Config
 current-context: test
 contexts: []
-"#.to_string(),
+"#
+            .to_string(),
         };
         assert!(KubeContext::with_loader(&loader).is_none());
     }

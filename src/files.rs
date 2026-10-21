@@ -12,8 +12,8 @@ use skim::options::MatchScheme;
 use skim::prelude::SkimItemReader;
 use skim::tui::options::PreviewLayout;
 use skim_tab::{
-    base_options, build_options, fd_discover, indexed_dirs_under, merge_sources, parse_query,
-    run_skim_on_tty, shell_quote, FdTarget, ICON_FILES, ICON_MARKER,
+    FdTarget, ICON_FILES, ICON_MARKER, base_options, build_options, fd_discover,
+    indexed_dirs_under, merge_sources, parse_query, run_skim_on_tty, shell_quote,
 };
 
 /// Frecent directories pulled into the feed's head.
@@ -82,10 +82,7 @@ fn main() -> Result<()> {
     // store rather than against fixtures. Sibling of `skim-history
     // --rank-report`, same reasoning.
     if let Some(pos) = args.iter().position(|a| a == "--feed-report") {
-        let top: usize = args
-            .get(pos + 1)
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(10);
+        let top: usize = args.get(pos + 1).and_then(|s| s.parse().ok()).unwrap_or(10);
         println!("cwd            {}", cwd.display());
         println!("frecent        {}", frecent.len());
         println!("fd             {}", fd_lines.len());
