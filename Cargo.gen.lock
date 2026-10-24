@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "cargo_lock_sha256": "569848295f46688082275fda7bb35569efad1c9a10e1f5dce472d66158a5b578",
+  "cargo_lock_sha256": "577c02597f97c6047e483018378800025ba894103394c2165a682474959d6a09",
   "manifest_sha256": {
-    "Cargo.toml": "68a159b1bb6efd9b723000e92a682d94000799ff7ac0fb2af57d8d5029ab49a1"
+    "Cargo.toml": "3b29ce234b7d9ee8a051fd40254110de76eff38a13b0bdb8ffa2865c2125d37a"
   },
   "target_resolves": {
     "base": {
@@ -141,7 +141,7 @@
           },
           {
             "name": "smallvec",
-            "package_key": "smallvec-1.16.3",
+            "package_key": "smallvec-1.16.4",
             "kind": "normal",
             "features": [
               "const_generics"
@@ -4745,7 +4745,7 @@
           },
           {
             "name": "smallvec",
-            "package_key": "smallvec-1.16.3",
+            "package_key": "smallvec-1.16.4",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -6632,7 +6632,7 @@
           },
           {
             "name": "smallvec",
-            "package_key": "smallvec-1.16.3",
+            "package_key": "smallvec-1.16.4",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7929,7 +7929,7 @@
           "default"
         ]
       },
-      "skim-tab-0.1.17": {
+      "skim-tab-0.1.18": {
         "runtime_dependencies": [
           {
             "name": "anyhow",
@@ -8102,7 +8102,7 @@
           "std"
         ]
       },
-      "smallvec-1.16.3": {
+      "smallvec-1.16.4": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": [
@@ -13593,7 +13593,7 @@
         }
       ]
     },
-    "skim-tab-0.1.17": {
+    "skim-tab-0.1.18": {
       "edition": "2024",
       "lib_target": {
         "name": "skim_tab",
@@ -13641,7 +13641,7 @@
     "slab-0.4.12": {
       "edition": "2018"
     },
-    "smallvec-1.16.3": {
+    "smallvec-1.16.4": {
       "edition": "2018"
     },
     "socket2-0.6.5": {
