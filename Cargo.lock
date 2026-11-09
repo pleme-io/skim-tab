@@ -142,9 +142,9 @@ dependencies = [
 
 [[package]]
 name = "arc-swap"
-version = "1.9.4"
+version = "1.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db4c94f57a570fce5d381be3289b3f79aef6332d72948fe82ab5772e423ccf92"
+checksum = "84a22b5d51209f6de83d37a0b33d320acb8da88823e42a94c075140708f032a5"
 dependencies = [
  "rustversion",
 ]
@@ -1091,9 +1091,9 @@ dependencies = [
 
 [[package]]
 name = "gen-macros"
-version = "0.1.55"
+version = "0.1.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "522e8f4d0f4af82ee13c37507c12907c0587a982f8a17c8b378b14ae81ac24c8"
+checksum = "ba95c1fb3915e3807932a5c669104b4855b0d01920d0d312cad8e8fa7a4f3af6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1102,9 +1102,9 @@ dependencies = [
 
 [[package]]
 name = "gen-platform"
-version = "0.1.55"
+version = "0.1.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2626761d01e0f872bb5ab92aa45fcfd1f820904a4da36f96b1b9a101ffa44fd"
+checksum = "7e5d3699d44a18f34f8058864bf79d65866036ff6e86d252896dd42e1db892b4"
 dependencies = [
  "gen-macros",
  "gen-types",
@@ -1116,9 +1116,9 @@ dependencies = [
 
 [[package]]
 name = "gen-types"
-version = "0.1.55"
+version = "0.1.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6d5dd9f013ffd978542607400199cf39f3fdff3feb36e52d13a4f7c20b6b0bd"
+checksum = "c33327440017edea181f9c007b0cbc38af8294f2e54912a61d9ed0fed26cc8e7"
 dependencies = [
  "blake3",
  "chrono",
@@ -2695,9 +2695,9 @@ checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
 
 [[package]]
 name = "shikumi"
-version = "0.1.1084"
+version = "0.1.1085"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d340f2caa2bc6c020e7223bc89cd330687a9dd2aacdcfe6686f46ba1339ea1c1"
+checksum = "782d8d81fe59ce4980060c8ed60383b92c198ba707b6bc8a86fce0533301b27b"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -2817,7 +2817,7 @@ dependencies = [
 
 [[package]]
 name = "skim-tab"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "anyhow",
  "chrono",

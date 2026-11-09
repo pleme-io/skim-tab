@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "cargo_lock_sha256": "8105920b6ef6109501903c8217891529870bbd7548f7db8a83b6c1d514ddecd3",
+  "cargo_lock_sha256": "5aaf78f6336a313f98253c89db0ffc7a06e8a0092ca7a7761ff679b6d0bf6b4b",
   "manifest_sha256": {
-    "Cargo.toml": "0fffb0f27e7969bf679a8a810a218d0b2de220781fae574e550df675615869f1"
+    "Cargo.toml": "2e1606aeb22ac2ded265f2f6e608144b221154cdc15a65058a552a39f347b7ed"
   },
   "target_resolves": {
     "base": {
@@ -297,7 +297,7 @@
           "std"
         ]
       },
-      "arc-swap-1.9.4": {
+      "arc-swap-1.9.5": {
         "runtime_dependencies": [
           {
             "name": "rustversion",
@@ -2912,7 +2912,7 @@
           "std"
         ]
       },
-      "gen-macros-0.1.55": {
+      "gen-macros-0.1.56": {
         "runtime_dependencies": [
           {
             "name": "proc_macro2",
@@ -2951,11 +2951,11 @@
         "build_dependencies": [],
         "features": []
       },
-      "gen-platform-0.1.55": {
+      "gen-platform-0.1.56": {
         "runtime_dependencies": [
           {
             "name": "gen_macros",
-            "package_key": "gen-macros-0.1.55",
+            "package_key": "gen-macros-0.1.56",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -2965,7 +2965,7 @@
           },
           {
             "name": "gen_types",
-            "package_key": "gen-types-0.1.55",
+            "package_key": "gen-types-0.1.56",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -3019,7 +3019,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "gen-types-0.1.55": {
+      "gen-types-0.1.56": {
         "runtime_dependencies": [
           {
             "name": "blake3",
@@ -7150,11 +7150,11 @@
           "std"
         ]
       },
-      "shikumi-0.1.1084": {
+      "shikumi-0.1.1085": {
         "runtime_dependencies": [
           {
             "name": "arc_swap",
-            "package_key": "arc-swap-1.9.4",
+            "package_key": "arc-swap-1.9.5",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7187,7 +7187,7 @@
           },
           {
             "name": "gen_platform",
-            "package_key": "gen-platform-0.1.55",
+            "package_key": "gen-platform-0.1.56",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7197,7 +7197,7 @@
           },
           {
             "name": "gen_types",
-            "package_key": "gen-types-0.1.55",
+            "package_key": "gen-types-0.1.56",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -7853,7 +7853,7 @@
           "default"
         ]
       },
-      "skim-tab-0.1.19": {
+      "skim-tab-0.1.20": {
         "runtime_dependencies": [
           {
             "name": "anyhow",
@@ -7977,7 +7977,7 @@
           },
           {
             "name": "shikumi",
-            "package_key": "shikumi-0.1.1084",
+            "package_key": "shikumi-0.1.1085",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -13693,7 +13693,7 @@
     "ar_archive_writer-0.5.3": {
       "edition": "2024"
     },
-    "arc-swap-1.9.4": {
+    "arc-swap-1.9.5": {
       "edition": "2018"
     },
     "arrayvec-0.7.8": {
@@ -14037,14 +14037,14 @@
     "futures-util-0.3.34": {
       "edition": "2018"
     },
-    "gen-macros-0.1.55": {
+    "gen-macros-0.1.56": {
       "edition": "2024",
       "proc_macro": true
     },
-    "gen-platform-0.1.55": {
+    "gen-platform-0.1.56": {
       "edition": "2024"
     },
-    "gen-types-0.1.55": {
+    "gen-types-0.1.56": {
       "edition": "2024"
     },
     "generic-array-0.14.7": {
@@ -14574,7 +14574,7 @@
     "shell-words-1.1.1": {
       "edition": "2015"
     },
-    "shikumi-0.1.1084": {
+    "shikumi-0.1.1085": {
       "edition": "2024"
     },
     "shlex-1.3.0": {
@@ -14608,7 +14608,7 @@
         }
       ]
     },
-    "skim-tab-0.1.19": {
+    "skim-tab-0.1.20": {
       "edition": "2024",
       "lib_target": {
         "name": "skim_tab",
