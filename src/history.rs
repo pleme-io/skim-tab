@@ -44,7 +44,7 @@ fn now_unix() -> i64 {
 /// deliberate: zsh itself resolves a relative `HISTFILE` against the cwd, so
 /// rejecting one here would make skim-tab disagree with the shell whose
 /// history it is reading. Faithfulness to the shell beats the absolute rule on
-/// this specific variable — see `theory/MASKED-BRANCH.md` §V on not changing
+/// this specific variable: a fix does not change
 /// what a valid configuration resolves to.
 ///
 /// `$HOME` is different. It used to fall back to `"."`, which is not a
